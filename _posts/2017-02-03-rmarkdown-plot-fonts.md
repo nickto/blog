@@ -7,25 +7,14 @@ categories: [R Markdown]
 tags: [r, r markdown, figures, latex, fonts]
 ---
 
-## TL; DR
+Let us be honest, one of the reasons we use [R Markdown](http://rmarkdown.rstudio.com/) to compile documents into PDF is the aesthetic pleasure provided by LaTeX. However, all the efforts can be ruined by wrong fonts in plots that are not the same as in the rest of the document. [For example](/assets/posts/2017-02-03-rmarkdown-plot-fonts/poor-fonts.pdf)
 
-Make sure you have [tikzDevice](https://cran.r-project.org/web/packages/tikzDevice/index.html) package, then either specify `dev = "tikz"` option for all chunks like this
+<img src="/assets/posts/2017-02-03-rmarkdown-plot-fonts/poor-fonts-screenshot.png" alt="These are some ugly fonts!" style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
-{% highlight r %}
-knitr::opts_chunk$set(..., dev = "tikz")
-{% endhighlight %}
-
-or specify it for each chunk separately.
-
-## Longer story
-
-Let us be honest, one of the reasons we use [R Markdown](http://rmarkdown.rstudio.com/) to compile documents into PDF is the aesthetic pleasure provided by LaTeX. However, all the efforts can be ruined by wrong fonts in plots that are not the same as in the rest of the document. [For example](/assets/posts/2017-02-03-rmarkdown-plot-fonts/poor-fonts.pdf),
-
-![These are some ugly fonts!]({{ site.url }}/assets/posts/2017-02-03-rmarkdown-plot-fonts/poor-fonts-screenshot.png)
 
 Well, these are some ugly fonts (not by itself, but in combination with the rest of the document). Would not it be much better to have something like [this](/assets/posts/2017-02-03-rmarkdown-plot-fonts/good-fonts.pdf)?
 
-![These are some nice fonts!]({{ site.url }}/assets/posts/2017-02-03-rmarkdown-plot-fonts/good-fonts-screenshot.png)
+<img src="/assets/posts/2017-02-03-rmarkdown-plot-fonts/good-fonts-screenshot.png" alt="These are some nice fonts!" style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
 So how can we make the good ones? Well, the answer is easy: just let LaTeX render your images and it will take care of the rest.
 
@@ -49,4 +38,15 @@ plot(rnorm(10), rnorm(10))
 {% endhighlight %}
 
 ## Reproducible example
+
 Reproducible example can be found [here](/assets/posts/2017-02-03-rmarkdown-plot-fonts/good-fonts.Rmd).
+
+## TL; DR
+
+Make sure you have [tikzDevice](https://cran.r-project.org/web/packages/tikzDevice/index.html) package, then either specify `dev = "tikz"` option for all chunks like this
+
+{% highlight r %}
+knitr::opts_chunk$set(..., dev = "tikz")
+{% endhighlight %}
+
+or specify it for each chunk separately.
