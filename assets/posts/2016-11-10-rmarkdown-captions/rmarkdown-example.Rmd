@@ -1,0 +1,23 @@
+---
+title: "Table and Figure Captions Example"
+date: "November 10, 2016"
+output: 
+  pdf_document:
+    fig_caption: yes
+---
+
+```{r}
+data(iris)
+knitr::kable(head(iris))
+```
+
+Table: Head of iris data. \label{tab:iris}
+
+And we can refer Table \ref{tab:iris} just as in Pandoc Markdown.
+
+```{r, fig.cap="Scatterplot of width and length. \\label{fig:iris}"}
+plot(iris$Sepal.Length, iris$Sepal.Width)
+```
+
+And we can refer Figure \ref{fig:iris} just as in Pandoc Markdown.
+
