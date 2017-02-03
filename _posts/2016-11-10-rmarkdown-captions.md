@@ -1,6 +1,6 @@
 ---
 layout: post
-disqus: true
+comments: true
 title:  "Table and figure captions in R Markdown"
 date:   2016-11-10 16:30:00
 categories: [R Markdown]
