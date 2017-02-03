@@ -2,7 +2,7 @@
 layout: post
 disqus: true
 title:  "Table and figure captions in R Markdown"
-date:   2017-02-03 16:30:00
+date:   2016-11-10 16:30:00
 categories: [R Markdown]
 tags: [r, r markdown, captions, figures, tables]
 ---
