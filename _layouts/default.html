@@ -16,6 +16,11 @@
     <!-- Customisation  -->
     <link rel="stylesheet" type="text/css" href="/assets/css/main.css" />
 
+    <!-- MathJax -->
+    {% if page.use_math %}
+      {% include mathjax_support.html %}
+    {% endif %}
+
 </head>
 <body class="{% if page.post_class %}{{page.post_class}}{% else %}home-template{% endif %}">
 
@@ -34,11 +39,6 @@
     <script type="text/javascript" src="/assets/js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="/assets/js/jquery.fitvids.js"></script>
     <script type="text/javascript" src="/assets/js/index.js"></script>
-
-    <!-- MathJax -->
-    <script type="text/javascript"
-        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
-    </script>
 
     <!-- Google Analytics Tracking code -->
     <script type="text/javascript">
