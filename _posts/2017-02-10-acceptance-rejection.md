@@ -25,12 +25,6 @@ then $ c g(x)$ is called the _majorizing distribution_.
 
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_1_edited.svg" alt="Distributions." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
-If the support of the target density function has clear boundaries $a, b \in \mathbb{R}$, then it is common to take uniform distribution as $g(x)$.
-
-<img src="/assets/posts/2017-02-10-acceptance-rejection/example_2_edited.svg" alt="Uniform as majorizing." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
-
-However, to make intuition more illustrative, let us continue using the previous example (with a distribution that is not uniform).
-
 ### Draw a number
 After we have found appropriate majorizing distribution, we draw a number, $ y $ from $ g(x) $, using any other method. We will draw numbers from regions with high $ g(x) $ density more often (that is, basically, the definition of density). Thus, if $ g(x) $ is similar to $ f(x) $ then we already get some approximation.
 
@@ -211,7 +205,7 @@ $$
 \end{align}
 $$
 
-Thus, accepting values $y$ sampled from a majorizing distribution with probability $\frac{f(y)}{cg(y)}$ is the same as sampling from $F(y)$ directly. 
+Thus, accepting values $y$ sampled from a majorizing distribution with probability $\frac{f(y)}{cg(y)}$ is the same as sampling from $F(y)$ directly.
 
 
 
