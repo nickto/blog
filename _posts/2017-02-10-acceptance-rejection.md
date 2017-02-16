@@ -15,7 +15,7 @@ Although there is quite a lot of information on the topic available, I will try 
 ## Idea
 
 ### Majorizing distribution
-Let us say that we want to draw numbers from some distribution $ f(x) $---_target distribution_---but we have only distribution $ g(x) $, such that by multiplying it with some constant $ c $ it will always be larger than $ f(x) $,
+Let us say that we want to draw numbers from some distribution[^1] $ f(x) $---_target distribution_---but we have only distribution $ g(x) $, such that by multiplying it with some constant $ c $ it is always larger than $ f(x) $,
 
 $$
 \forall x: cg(x) \ge f(x),
@@ -26,31 +26,32 @@ then $ c g(x)$ is called the _majorizing distribution_.
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_1_edited.svg" alt="Distributions." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
 ### Draw a number
-After we have found appropriate majorizing distribution, we draw a number, $ y $ from $ g(x) $, using any other method. We will draw numbers from regions with high $ g(x) $ density more often (that is, basically, the definition of density). Thus, if $ g(x) $ is similar to $ f(x) $ then we already get some approximation.
+After we have found an appropriate majorizing distribution, we draw a number, $ y $ from $ g(x) $, using any other method (e.g., inverse CDF). We draw numbers from regions with high $ g(x) $ density more often (that is, basically, the definition of density). Thus, if $ g(x) $ is similar to $ f(x) $ then we already get some approximation.
 
-So, let us say that the value of $ y $ appeared to be the following[^1]:
+So, let us say that the value of $ y $ appeared to be the following[^2]:
 
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_3_edited.svg" alt="Realizations." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
 ### Decide whether to accept or reject it
-If we wanted to draw realizations from the $ g(x) $ distribution, we would stop here. However, we want to draw them from another---$f(x)$---distribution. Thus, we have to adjust for it. We know that the actual probability of drawing this number is higher (because $ cg(y) \ge f(x)$), therefore, we want to sometimes discard this number and pretend that nothing happened. In this way, we will actually lower the probability of returning this number as the realization of the random variable.
+If we wanted to draw realizations from the $ g(x) $ distribution, we would stop here. However, we want to draw them from another---$f(x)$---distribution. Thus, we have to adjust for it. We know that the actual probability of drawing this number is higher (because $ cg(y) \ge f(x)$), therefore, we want to sometimes discard this number and pretend that nothing happened. In this way, we actually lower the probability of returning this number as the realization of the random variable.
 
 Therefore, we keep this number and claim that this actually is the realization from the target distribution only in
 
 $$
 \frac{f(y)}{cg(y)}
 $$
-proportion of cases: there is $ cg(y) $ probability[^2] to draw this number, but we wanted it to draw only with probability $ f(y) $. This makes much more sense when we visualize it:
+
+proportion of cases: there is $ cg(y) $ probability[^3] to draw this number, but we wanted it to draw only with probability $ f(y) $. This makes much more sense when we visualize it:
 
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_4_edited.svg" alt="Why this fraction?" style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
-Note that because we have chosen the majorizing distribution to be greater or equal to the target one, the described fraction will be always between 0 and 1:
+Note that because we have chosen the majorizing distribution to be greater or equal to the target one, the described fraction is always between 0 and 1:
 
 $$
 \frac{f(y)}{cg(y)} \in (0;1) .
 $$
 
-Thus, in order to ensure that we keep it only in the required proportion of cases we will draw another random variable, $ u $, from a uniform distribution,
+Thus, in order to ensure that we keep it only in the required proportion of cases we draw another random variable, $ u $, from a uniform distribution,
 
 $$
 u \sim \operatorname{unif}(0;1) ,
@@ -64,16 +65,16 @@ $$
 
 otherwise reject it.
 
-Let us visualize it. Let us consider 3 different values of $ u $:
+Let us visualize it. Let us consider 3 possible values of $ u $:
 
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_5_edited.svg" alt="Accepting and rejecting." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
-For values $ u_2 $ and $ u_3 $ we reject $ y $ and for the value $ u_1 $)---accept it. All values of $ u_i $ are equally likely to appear. Moreover, the value $ u $ is equally likely to appear anywhere on the line (because it is sampled from the uniform distribution). Therefore, we will accept it in the required proportion of cases.
+For values $ u_2 $ and $ u_3 $ we would reject $ y $ and for the value $ u_1 $)---accept it. All values of $ u_i $ are equally likely to appear. Moreover, the value $ u $ is equally likely to appear anywhere on the line (because it is sampled from the uniform distribution). Therefore, we accept $y$ in the required proportion of cases.
 
-To sum up, we draw realizations from $cg(y)$ distribution and then decide whether to accept only a fraction of them in order to correct for differences between $cg(y)$ and $f(y)$.
+To sum up, we draw realizations from $cg(y)$ distribution but accept only a fraction of them in order to correct for differences between $cg(y)$ and $f(y)$.
 
 ## Algorithm
-Now it is easy to put this algorithm in pseudo-code:
+Now it is easy to put this algorithm into pseudo-code:
 
 $$
 \begin{align*}
@@ -86,8 +87,8 @@ $$
 \end{align*}
 $$
 
-## Proof[^3]
-First, let us find the expected number of draws, $ N$ before we finally get a success. It is easy to see that this quantity is [geometrically distributed](https://en.wikipedia.org/wiki/Geometric_distribution), because that is what the geometric distribution models.
+## Proof[^4]
+First, let us find the expected number of draws, $N$, before we finally get a success. It is easy to see that this quantity is [geometrically distributed](https://en.wikipedia.org/wiki/Geometric_distribution), because that is what the geometric distribution models.
 
 $$
 \begin{align}
@@ -114,7 +115,7 @@ p = &\ \Pr \left( U \le \frac{f(Y)}{cg(Y)} \mid Y = y \right) \label{eq:U_cond_o
 \end{align}
 $$
 
-which can be simplified: since $U \sim \operatorname{unif}(0;1)$, we simply integrate $1$, because $\forall u \in (0;1): f(u) = 1$.
+which can be simplified: since $U \sim \operatorname{unif}(0;1)$, we simply integrate $1$, because because the value of $\operatorname{unif}(0;1)$ density function is always 1 on this interval:
 
 $$
 \begin{align}
@@ -188,7 +189,7 @@ $$
 \end{align}
 $$
 
-It is something very familiar. And indeed, it is almost the same equation as (\ref{eq:U_cond_on_y_equality}), with the only difference being that instead of $Y = y$, we now have $Y \le y$. Thus, we need to integrate it for all values of $Y \in (-\infty; y)$ (also, note that $y$ is constant and therefore we can take $G(y)$ out of the integration sign):
+It is something very familiar. And indeed, it is almost the same equation as (\ref{eq:U_cond_on_y_equality}), with the only difference being that instead of $Y = y$, we now have $Y \le y$. Thus, we need to integrate it for all values of $Y \in (-\infty; y)$ (also, note that $y$ is a constant and therefore we can take $G(y)$ out of the integration sign):
 
 $$
 \begin{align}
@@ -209,14 +210,8 @@ Thus, accepting values $y$ sampled from a majorizing distribution with probabili
 
 
 
-
-
-
-
-
-
-
 ## Notes
-[^1]: Since $cg(x)$ is just a scaled version of $g(x)$, we will not show it on the illustrations anymore.
-[^2]: Technically, this is not probability, because we are talking about continuous distributions, but this should be close enough for intuition.
-[^3]: Proof is taken from [here](http://www.columbia.edu/~ks20/4703-Sigman/4703-07-Notes-ARM.pdf) with some comments.
+[^1]: As we will see later, this method depends only on the ratio of the target distribution to an arbitrary distribution, which density is arbitrary scaled. Thus, the method works even if only know a function to which the target distribution is proportional: "target distribution is known up to a multiplicative constant".
+[^2]: Since $cg(x)$ is just a scaled version of $g(x)$, we will not show it on the illustrations anymore.
+[^3]: Technically, this is not probability, because we are talking about continuous distributions, but this should be close enough for intuition.
+[^4]: Proof is taken from [here](http://www.columbia.edu/~ks20/4703-Sigman/4703-07-Notes-ARM.pdf) with some comments.
