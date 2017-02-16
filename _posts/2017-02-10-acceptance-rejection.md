@@ -15,7 +15,7 @@ Although there is quite a lot of information on the topic available, I will try 
 ## Idea
 
 ### Majorizing distribution
-Let us say that we want to draw numbers from some distribution[^1] $ f(x) $---_target distribution_---but we have only distribution $ g(x) $, such that by multiplying it with some constant $ c $ it is always larger than $ f(x) $,
+Let us say that we want to draw numbers from some distribution[^1] $ f(x) $---*target distribution*---but we have only distribution $ g(x) $, such that by multiplying it with some constant $ c $ it is always larger than $ f(x) $,
 
 $$
 \forall x: cg(x) \ge f(x),
