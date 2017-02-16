@@ -21,15 +21,15 @@ $$
 \forall x: cg(x) \ge f(x),
 $$
 
-then $ c g(x)$ is _majorizing distribution_.
+then $ c g(x)$ is called the _majorizing distribution_.
 
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_1_edited.svg" alt="Distributions." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
-What if we don't have such $ g(x)$? That is impossible. We always have it: if nothing else works, we can rescale the uniform distribution by the appropriate constant, $ c $, such that $ c g(x)  $ is equal (or larger) than $ f(x) $ in the mode. Like this:
+If the support of the target density function has clear boundaries $a, b \in \mathbb{R}$, then it is common to take uniform distribution as $g(x)$.
 
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_2_edited.svg" alt="Uniform as majorizing." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
-However, to make intuition more illustrative, let us continue using the previous example. Moreover, using the uniform distribution as the majorizing one can be extremely inefficient, and we will later see why.
+However, to make intuition more illustrative, let us continue using the previous example (with a distribution that is not uniform).
 
 ### Draw a number
 After we have found appropriate majorizing distribution, we draw a number, $ y $ from $ g(x) $, using any other method. We will draw numbers from regions with high $ g(x) $ density more often (that is, basically, the definition of density). Thus, if $ g(x) $ is similar to $ f(x) $ then we already get some approximation.
@@ -39,14 +39,14 @@ So, let us say that the value of $ y $ appeared to be the following[^1]:
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_3_edited.svg" alt="Realizations." style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
 ### Decide whether to accept or reject it
-If we wanted to draw realizations from the $ g(x) $ distribution, we would stop here. However, we want to draw them from another---$f(x)$---distribution. Thus, we have to adjust for it. We know that the actual probability of drawing this number was higher (because $ cg(y) \ge f(x)$), therefore, we want to sometimes discard this number and pretend that nothing happened. In this way, we will actually lower the probability of returning this number as the realization of the random variable.
+If we wanted to draw realizations from the $ g(x) $ distribution, we would stop here. However, we want to draw them from another---$f(x)$---distribution. Thus, we have to adjust for it. We know that the actual probability of drawing this number is higher (because $ cg(y) \ge f(x)$), therefore, we want to sometimes discard this number and pretend that nothing happened. In this way, we will actually lower the probability of returning this number as the realization of the random variable.
 
 Therefore, we keep this number and claim that this actually is the realization from the target distribution only in
 
 $$
 \frac{f(y)}{cg(y)}
 $$
-proportion of cases: there was $ cg(y) $ probability[^2] to draw this number, but we wanted it to draw only with probability $ f(y) $. This makes much more sense when we visualize it:
+proportion of cases: there is $ cg(y) $ probability[^2] to draw this number, but we wanted it to draw only with probability $ f(y) $. This makes much more sense when we visualize it:
 
 <img src="/assets/posts/2017-02-10-acceptance-rejection/example_4_edited.svg" alt="Why this fraction?" style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
 
@@ -76,6 +76,8 @@ Let us visualize it. Let us consider 3 different values of $ u $:
 
 For values $ u_2 $ and $ u_3 $ we reject $ y $ and for the value $ u_1 $)---accept it. All values of $ u_i $ are equally likely to appear. Moreover, the value $ u $ is equally likely to appear anywhere on the line (because it is sampled from the uniform distribution). Therefore, we will accept it in the required proportion of cases.
 
+To sum up, we draw realizations from $cg(y)$ distribution and then decide whether to accept only a fraction of them in order to correct for differences between $cg(y)$ and $f(y)$.
+
 ## Algorithm
 Now it is easy to put this algorithm in pseudo-code:
 
@@ -95,7 +97,7 @@ First, let us find the expected number of draws, $ N$ before we finally get a su
 
 $$
 \begin{align}
-\Pr(N = n) = &\ (1 - p)^{n - 1} p, \quad n \ge 1, \, \operatorname{E}(N) = &\ \frac{1}{p} ,
+\Pr(N = n) = &\ (1 - p)^{n - 1} p, \quad n \ge 1, \, \operatorname{E}(N) = \frac{1}{p} ,
 \end{align}
 $$
 
@@ -105,7 +107,7 @@ Second, let us find the value of $ p $:
 
 $$
 \begin{align}
-p = \Pr \left( U \le \frac{f(Y)}{cg(Y)} \right) .
+p = \Pr \left( U \le \frac{f(Y)}{cg(Y)} \right) \label{eq:p} .
 \end{align}
 $$
 
@@ -113,12 +115,12 @@ Since $ \frac{f(Y)}{cg(Y)} $ is a random variable itself, let us fix the value o
 
 $$
 \begin{align}
-p = &\ \Pr \left( U \le \frac{f(Y)}{cg(Y)} \mid Y = y \right) \\
+p = &\ \Pr \left( U \le \frac{f(Y)}{cg(Y)} \mid Y = y \right) \label{eq:U_cond_on_y_equality} \\
   = &\ \Pr \left( U \le \frac{f(y)}{cg(y)} \right) ,
 \end{align}
 $$
 
-which simplifies, because $U \sim \operatorname{unif}(0;1)$ we simply integrate $1$
+which can be simplified: since $U \sim \operatorname{unif}(0;1)$, we simply integrate $1$, because $\forall u \in (0;1): f(u) = 1$.
 
 $$
 \begin{align}
@@ -132,18 +134,95 @@ Then we remove the conditioning by integrating over all possible values of $y$
 $$
 \begin{align}
 p = & \int_{-\infty}^{+\infty} \frac{f(y)}{cg(y)} \times g(y) dy
-  = \frac{1}{c} \frac{1}{c} \int_{-\infty}^{+\infty} \frac{f(y)}{c} \frac{g(y)}{g(y)} dy \\
+  = \frac{1}{c} \int_{-\infty}^{+\infty} f(y) \frac{g(y)}{g(y)} dy \\
   = &\ \frac{1}{c} \underbrace{\int_{-\infty}^{+\infty} f(y) dy }_{1} = \frac{1}{c} \times 1 = \frac{1}{c} \label{eq:t} ,
 \end{align}
 $$
 
-where the integral in (\ref{eq:t}) is equal to $1$, because $f(y)$ is a popper density function and integrates to $1$.
+where the integral in (\ref{eq:t}) is equal to $1$, because $f(y)$ is a proper density function and it integrates to $1$.
+
+Now recall the [Bayes' theorem](https://en.wikipedia.org/wiki/Bayes'_theorem):
+
+$$
+\begin{align}
+  \Pr (A \mid B) = \frac{\Pr(B \mid A) \Pr(A)}{\Pr(B)} \label{eq:bayes}.
+\end{align}
+$$
+
+In our case
+
+$$
+\begin{align}
+\Pr(A) = &\ \Pr(Y \le y) \\
+\Pr(B) = &\ \Pr \left( U \le \frac{f(Y)}{cg(Y)} \right) = p = \frac{1}{c} \label{eq:pr_B} ,
+\end{align}
+$$
+
+where (\ref{eq:pr_B}) is true, because it is the same as (\ref{eq:p}). Thereore, with the above definitions of $A$ and $B$ (\ref{eq:bayes}) becomes
+
+$$
+\begin{align}
+\Pr \left( Y \le y \mid U \le \frac{f(Y)}{cg(Y)} \right)
+  = &\ \Pr \left( U \le \frac{f(Y)}{cg(Y)}  \mid Y \le y \right) \times \frac{G(Y)}{\frac{1}{c}} \label{eq:bayes_substituted} .
+\end{align}
+$$
+
+From the definitions of [conditional probability](https://en.wikipedia.org/wiki/Conditional_probability) it follows that
+
+$$
+\begin{align}
+\Pr(B \mid A) = \frac{\Pr(B, A)}{\Pr(A)} ,
+\end{align}
+$$
+
+and therefore we can express a term in (\ref{eq:bayes_substituted}) as
+
+$$
+\begin{align}
+\Pr \left( U \le \frac{f(Y)}{cg(Y)}  \mid Y \le y \right)
+  = &\ \frac{\Pr \left(U \le \frac{f(Y)}{cg(Y)} , \Pr(Y \le y \right)}{\Pr(Y \le y )} \nonumber \\
+  = &\ \frac{\Pr \left(U \le \frac{f(Y)}{cg(Y)} , Y \le y \right)}{G(y)} .
+\end{align}
+$$
+
+We know that $Y$ and $U$ are statistically independent, therefore
+
+$$
+\begin{align}
+\frac{\Pr \left(U \le \frac{f(Y)}{cg(Y)} , Y \le y \right)}{G(y)}
+  =&\ \frac{\Pr \left(U \le \frac{f(Y)}{cg(Y)} \mid Y \le y \right)}{G(y)} .
+\end{align}
+$$
+
+It is something very familiar. And indeed, it is almost the same equation as (\ref{eq:U_cond_on_y_equality}), with the only difference being that instead of $Y = y$, we now have $Y \le y$. Thus, we need to integrate it for all values of $Y \in (-\infty; y)$ (also, note that $y$ is constant and therefore we can take $G(y)$ out of the integration sign):
+
+$$
+\begin{align}
+\frac{\Pr \left(U \le \frac{f(Y)}{cg(Y)} \mid Y \le y \right)}{G(y)}
+  = &\ \frac{1}{G(Y)} \int_{-\infty}^{y} \frac{f(w)}{cg(w)} g(w) dw \nonumber \\
+  = &\ \frac{1}{c G(Y)} \underbrace{\int_{-\infty}^{y} f(w) dw}_{F(y)} = \frac{F(y)}{cG(y)} \label{eq:U_cond_on_y_inequality}.
+\end{align}
+$$
+
+Substituting (\ref{eq:U_cond_on_y_inequality}) back into (\ref{eq:bayes_substituted}) we get
+$$
+\begin{align}
+\Pr \left( Y \le y \mid U \le \frac{f(Y)}{cg(Y)} \right) = \frac{F(y)}{cG(y)} \times c G(Y) = F(y) .
+\end{align}
+$$
+
+Thus, accepting values $y$ sampled from a majorizing distribution with probability $\frac{f(y)}{cg(y)}$ is the same as sampling from $F(y)$ directly. 
+
+
+
+
+
 
 
 
 
 
 ## Notes
-[^1]: Since $cg(x)$ is just a scaled version of $g(x)$, we will not show it anymore.
+[^1]: Since $cg(x)$ is just a scaled version of $g(x)$, we will not show it on the illustrations anymore.
 [^2]: Technically, this is not probability, because we are talking about continuous distributions, but this should be close enough for intuition.
 [^3]: Proof is taken from [here](http://www.columbia.edu/~ks20/4703-Sigman/4703-07-Notes-ARM.pdf) with some comments.
