@@ -1,6 +1,6 @@
 baseURL: http://blog.nickto.net/
 languageCode: en-gb
-title: Notes about data science and other things
+title: Notes about various things
 theme: ananke
 permalinks:
   posts: /:year-:month-:day-:title/
