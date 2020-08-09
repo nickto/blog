@@ -26,3 +26,4 @@ params:
   gitlab:  https://gitlab.com/nickto
   description: >-
     Notes about data science and related things mostly for myself.  
+  featured_image: /home/riga-header.jpg
