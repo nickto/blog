@@ -2,6 +2,12 @@ baseURL: http://blog.nickto.net/
 languageCode: en-gb
 title: Notes about various things
 theme: ananke
+
+DefaultContentLanguage: en
+Paginate: 10
+googleAnalytics: 
+enableRobotsTXT: true
+
 permalinks:
   posts: /:year-:month-:day-:title/
 markup:
