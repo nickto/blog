@@ -4,8 +4,8 @@ title: Notes about various things
 theme: ananke
 
 DefaultContentLanguage: en
-Paginate: 10
-googleAnalytics: 
+paginate: 10
+googleAnalytics: UA-97311821-1
 enableRobotsTXT: true
 
 permalinks:
