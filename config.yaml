@@ -1,4 +1,4 @@
-baseURL: nickto.netlify.app
+baseURL: https://nickto.netlify.app/
 languageCode: en-gb
 title: Notes about various things
 theme: ananke
