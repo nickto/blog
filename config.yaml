@@ -1,0 +1,18 @@
+baseURL: http://blog.nickto.net/
+languageCode: en-gb
+title: Notes about data science ant other things
+theme: ananke
+permalinks:
+  posts: /:year-:month-:day-:title/
+markup:
+  highlight:
+    codeFences: true
+    guessSyntax: true
+    hl_Lines: ""
+    lineNoStart: 1
+    lineNos: false
+    lineNumbersInTable: true
+    noClasses: true
+    style: monokai
+    tabWidth: 4
+
