@@ -21,4 +21,8 @@ markup:
     noClasses: true
     style: monokai
     tabWidth: 4
-
+params:
+  github: https://github.com/nickto
+  gitlab:  https://gitlab.com/nickto
+  description: >-
+    Notes about data science and related things mostly for myself.  
