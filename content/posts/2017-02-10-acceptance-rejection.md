@@ -29,8 +29,7 @@ $$`
 
 then $ c g(x)$ is called the _majorizing distribution_.
 
-<img src="{{< static_path >}}/example_1_edited.svg" alt="Distributions."
-style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
+![Distributions.]({{< static_path >}}/example_1_edited.svg)
 
 ### Draw a number
 
@@ -42,8 +41,7 @@ get some approximation.
 
 So, let us say that the value of $ y $ appeared to be the following[^2]:
 
-<img src="{{< static_path >}}/example_3_edited.svg" alt="Realizations."
-style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
+![Realizations.]({{< static_path >}}/example_3_edited.svg)
 
 ### Decide whether to accept or reject it
 
@@ -66,8 +64,7 @@ proportion of cases: there is $ cg(y) $ probability[^3] to draw this number, but
 we wanted it to draw only with probability $ f(y) $. This makes much more sense
 when we visualize it:
 
-<img src="{{< static_path >}}/example_4_edited.svg" alt="Why this fraction?"
-style="width: 100%; display: block; margin-left: auto; margin-right: auto;">
+![Why this fraction?]({{< static_path >}}/example_4_edited.svg)
 
 Note that because we have chosen the majorizing distribution to be greater or
 equal to the target one, the described fraction is always between 0 and 1:
@@ -93,12 +90,10 @@ otherwise reject it.
 
 Let us visualize it. Let us consider 3 possible values of $ u $:
 
-<img src="{{< static_path >}}/example_5_edited.svg" alt="Accepting and
-rejecting." style="width: 100%; display: block; margin-left: auto; margin-right:
-auto;">
+![Accepting and rejecting.]({{< static_path >}}/example_5_edited.svg)
 
-For values $ u_2 $ and $ u_3 $ we would reject $ y $ and for the value $ u_1
-$)---accept it. All values of $ u_i $ are equally likely to appear. Moreover,
+For values $ u_2 $ and $ u_3 $ we would reject $ y $ and for the value $ u_1 $
+---accept it. All values of $ u_i $ are equally likely to appear. Moreover,
 the value $ u $ is equally likely to appear anywhere on the line (because it is
 sampled from the uniform distribution). Therefore, we accept $y$ in the required
 proportion of cases.

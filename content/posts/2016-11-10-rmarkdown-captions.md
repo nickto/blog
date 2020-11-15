@@ -52,7 +52,7 @@ because it allows using LaTeX features in our (R) Markdown files. For example,
 we can add formulas by enclosing them in dollar signs, like this:
 `$Y \sim N(0, 1)$`. Or we reference our tables inside the text with the help of
 LaTeX capabilities. To do that, we should add `\label{some-label}` into caption
-and then `\ref{some-label}` to get the number of the referenced element in the
+and then `\\ref{some-label}` to get the number of the referenced element in the
 text.
 
 Adjusting the example above, it would look like this (in this example we have
@@ -83,9 +83,7 @@ pandoc pandoc-example.md -o pandoc-example.pdf`
 
 where `pandoc-example.md` is our Markdown input, and we want a PDF output):
 
-<p align="center">
-![]({{< static_path >}}/pandoc-example-screenshot.png){width=75%}
-</p align="center">
+![]({{< static_path >}}/pandoc-example-screenshot.png)
 
 
 ## R Markdown: combining both
@@ -149,9 +147,7 @@ obviously, results in a double backslash.
 Combining the table and the figure examples, we get the something like
 [this]({{< static_path >}}/rmarkdown-example.pdf):
 
-<p align="center">
-![]({{< static_path >}}/rmarkdown-example-screenshot.png){width=75%}
-</p align="center">
+![Screenshot of example]({{< static_path >}}/rmarkdown-example-screenshot.png)
 
 A reproducible example of the image above can be fount [here]({{< static_path
 >}}/rmarkdown-example.Rmd).

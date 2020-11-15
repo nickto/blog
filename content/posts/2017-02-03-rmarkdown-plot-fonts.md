@@ -11,20 +11,13 @@ aesthetic pleasure provided by LaTeX. However, all the efforts can be ruined by
 wrong fonts in plots that are not the same as in the rest of the document.
 [For example]({{< static_path >}}/poor-fonts.pdf)
 
-<img
-src="{{< static_path >}}/poor-fonts-screenshot.png"
-alt="These are some ugly fonts!" style="width: 100%; display: block;
-margin-left: auto; margin-right: auto;">
-
+![These are some ugly fonts!]({{< static_path >}}/poor-fonts-screenshot.png)
 
 Well, these are some ugly fonts (not by itself, but in combination with the rest
 of the document). Would not it be much better to have something like
 [this]({{< static_path >}}/good-fonts.pdf)?
 
-<img
-src="{{< static_path >}}/good-fonts-screenshot.png"
-alt="These are some nice fonts!" style="width: 100%; display: block;
-margin-left: auto; margin-right: auto;">
+![These are some nice fonts!]({{< static_path >}}/good-fonts-screenshot.png)
 
 So how can we make the good ones? Well, the answer is easy: just let LaTeX
 render your images and it will take care of the rest.
