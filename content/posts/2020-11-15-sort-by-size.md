@@ -1,7 +1,7 @@
 ---
 title: "Listing files and folders sorted by size"
 date: 2020-11-15T17:10:00+02:00
-draft: true
+draft: false
 ---
 
 ## Sort files and directories by size on disk
@@ -63,7 +63,6 @@ $ du -s *
 1024    file3
 64      file4
 ```
-
 
 #### `sort`
 
