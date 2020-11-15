@@ -21,6 +21,10 @@ markup:
     noClasses: true
     style: monokai
     tabWidth: 4
+  # This enables using raw HTML in markdown
+  goldmark:
+    renderer:
+      unsafe: true
 params:
   github: https://github.com/nickto
   gitlab:  https://gitlab.com/nickto
