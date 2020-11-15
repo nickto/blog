@@ -22,20 +22,20 @@ noting, though, that Pandoc uses its own extended version of Markdown called
 things it allows captioning your figures and tables. This is done in the
 following way for the figures
 
-{{< highlight markdown >}}
+```markdown
 ![Example of an image with a caption.](https://www.r-project.org/logo/Rlogo.png)
-{{< / highlight >}}
+```
 
 and in the following way for the tables
 
-{{< highlight markdown >}}
+```markdown
 | Column heading 1 | Column heading 2 |
 | -----------------| -----------------|
 | Some value       | Another values   |
 | One more values  | And the last one |
 
 Table: Example of a table with a caption.
-{{< / highlight >}}
+```
 
 If you want you result in a PDF format, then the default Pandoc settings would
 render image caption below an image, tables captions above a table. Moreover, it
@@ -58,7 +58,7 @@ text.
 Adjusting the example above, it would look like this (in this example we have
 also changed the size of an image by adding `{width=250px}`):
 
-{{< highlight markdown >}}
+```markdown
 ![Example of an image with a caption. \label{fig:example-figure}](
   https://www.r-project.org/logo/Rlogo.png){width=250px}
 
@@ -72,14 +72,14 @@ And in the text we can refer to Figure \ref{fig:example-figure} and Table
 
 Table: Example of a table with a caption. Note, that there is an empty line
 before this caption. \label{tab:example-table}
-{{< / highlight >}}
+```
 
 [This]({{< static_path >}}/pandoc-example.pdf) is how it looks after compiling
 it to pdf (in the command line:
 
-{{< highlight bash>}}
+```bash
 pandoc pandoc-example.md -o pandoc-example.pdf`
-{{< / highlight>}}
+```
 
 where `pandoc-example.md` is our Markdown input, and we want a PDF output):
 
@@ -122,11 +122,11 @@ dynamically. Luckily, R Markdown has a built-in way of adding captions.
 First, we need to add the following lines to our heading/front matter: the text
 between `---` and `---` at the very top of the document
 
-{{< highlight yaml >}}
+```yaml
 output: 
   pdf_document:
     fig_caption: yes
-{{< / highlight >}}
+```
 
 And now we can add captions to the code chunks with a `fig.cap` option. Like
 this:
@@ -142,7 +142,7 @@ And we can refer Figure \ref{fig:iris} just as in Pandoc Markdown.
 Note the double backslash, it is needed because in strings it serves an
 [escape character](https://en.wikipedia.org/wiki/Escape_character), and to make
 and actual backslash we need to escape it with a backslash first, which,
-obiously, results in a double backslash.
+obviously, results in a double backslash.
 
 ### Result
 

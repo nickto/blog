@@ -56,9 +56,9 @@ its default device. There is an option for chunks, however, that allows
 specifying the `dev` option, which stands for "device". We can either set it
 equal to `"tikz"` for all chunks by adding this option to the `opts_chunk`
 
-{{< highlight r >}}
+```r
 knitr::opts_chunk$set(..., dev = "tikz")
-{{< / highlight >}}
+```
 
 or specify it for each chunk manually, like this
 
@@ -80,8 +80,8 @@ Make sure you have
 [tikzDevice](https://cran.r-project.org/web/packages/tikzDevice/index.html)
 package, then either specify `dev = "tikz"` option for all chunks like this
 
-{{< highlight r >}}
+```r
 knitr::opts_chunk$set(..., dev = "tikz")
-{{< / highlight >}}
+```
 
 or specify it for each chunk separately.
