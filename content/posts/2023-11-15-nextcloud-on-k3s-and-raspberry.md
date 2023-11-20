@@ -1,7 +1,7 @@
 ---
 title: "Setting up NextCloud on Raspberry Pi 4 using k3s"
-date: 2023-11-15T21:00:00+02:00
-draft: true
+date: 2023-11-20T14:30:00+02:00
+draft: false
 ---
 
 ## Introduction
