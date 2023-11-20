@@ -1,6 +1,7 @@
 ---
 title: "Setting up NextCloud on Raspberry Pi 4 using k3s"
 date: 2023-11-20T14:30:00+02:00
+lastmod: 2023-11-20T21:40:00+02:00
 draft: false
 ---
 
@@ -120,7 +121,8 @@ curl -sfL https://get.k3s.io | sh -s  - \
 	--disable servicelb \
 	--disable traefik \
 	--flannel-backend wireguard-native \
-	--write-kubeconfig-mode 644
+	--write-kubeconfig-mode 644 \
+  --tls-san [public IP address or hostname]
 ```
 
 The command above installs and sets up a k3s server, but
