@@ -1,7 +1,7 @@
 ---
 title: "Setting up NextCloud on Raspberry Pi 4 using k3s"
 date: 2023-11-20T14:30:00+02:00
-lastmod: 2023-11-20T21:40:00+02:00
+lastmod: 2023-11-22T16:56:00+02:00
 draft: false
 ---
 
@@ -36,6 +36,7 @@ I mostly followed these guides, except for some specific problems:
 - [Deploy Nextcloud on k3s](https://greg.jeanmart.me/2020/04/13/deploy-nextcloud-on-kuberbetes--the-self-hos/)
 - [k3s rocks](https://k3s.rocks/install-setup)
 - [Raspberry Pi k3s stories](https://gdha.github.io/pi-stories)
+- [Pi Kubernetes Cluster Project](https://picluster.ricsanfre.com/)
 
 ## Outline
 
@@ -540,6 +541,27 @@ kubectl port-forward service/longhorn-frontend 8081:80 -n longhorn-system
 ```
 
 and accessing it on `localhost:8081`.
+
+Sometimes Longhorn volumes cannot be mounted into pods, with error message
+saying that a Longhorn device "is apparently in use by the system; will not make
+a filesystem here!"
+
+This seems to be caused by Multipath and the
+[suggested solution](https://longhorn.io/kb/troubleshooting-volume-with-multipath/)
+is to blacklist `/dev/sd*` devices from it. Create `/etc/multipath.conf` if it
+does not exist already, and blacklist `/dev/sd*` devices:
+
+```text
+blacklist {
+  devnode "^sd[a-z0-9]+"
+}
+```
+
+Then restart the service using
+
+```bash
+systemctl restart multipathd.service
+```
 
 ## 8. Install NextCloud {#nextcloud}
 
