@@ -60,11 +60,11 @@ Wireguard as a flannel backend. This should not matter on a single-node, yet doe
 
 ```bash
 sudo apt update && sudo apt install -y \
-	curl \
-	ca-certificates \
-	open-iscsi \
-	wireguard \
-	nfs-common
+  curl \
+  ca-certificates \
+  open-iscsi \
+  wireguard \
+  nfs-common
 ```
 
 ### Debian/Ubuntu specific
@@ -116,12 +116,12 @@ Install k3s as suggested [here](https://docs.k3s.io/quick-start), but with some
 
 ```bash
 curl -sfL https://get.k3s.io | sh -s  - \
-	server \
-	--cluster-init \
-	--disable servicelb \
-	--disable traefik \
-	--flannel-backend wireguard-native \
-	--write-kubeconfig-mode 644 \
+  server \
+  --cluster-init \
+  --disable servicelb \
+  --disable traefik \
+  --flannel-backend wireguard-native \
+  --write-kubeconfig-mode 644 \
   --tls-san [public IP address or hostname]
 ```
 
@@ -356,8 +356,8 @@ Then install using a Helm chart with overridden values:
 
 ```bash
 helm install ingress-nginx ingress-nginx/ingress-nginx \
-	--namespace kube-system \
-	-f values.yaml
+  --namespace kube-system \
+  -f values.yaml
 ```
 
 Check that everything was deployed
@@ -520,10 +520,10 @@ Then install
 
 ```bash
 helm install longhorn longhorn/longhorn \
-	--namespace longhorn-system \
-	--create-namespace \
-	--version 1.5.1 \
-	-f values.yaml
+  --namespace longhorn-system \
+  --create-namespace \
+  --version 1.5.1 \
+  -f values.yaml
 ```
 
 and check that it's working
