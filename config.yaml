@@ -6,7 +6,6 @@ theme: PaperMod
 DefaultContentLanguage: en
 paginattion:
   pagerSize: 10
-googleAnalytics: UA-97311821-1
 enableRobotsTXT: true
 
 permalinks:
