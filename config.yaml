@@ -38,6 +38,6 @@ params:
   comments: true
   disqusShortname: nickto0x64
 
-# services:
-#   disqus:
-#     shortname: nickto0x64
+services:
+  disqus:
+    shortname: nickto0x64
