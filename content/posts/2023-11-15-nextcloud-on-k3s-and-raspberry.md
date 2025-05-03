@@ -408,7 +408,7 @@ helm install \
 
 Check that pods are running
 
-```
+```bash
 kubectl get pods --namespace cert-manager
 ```
 

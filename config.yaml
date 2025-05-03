@@ -1,10 +1,11 @@
 baseURL: https://blog.nickto.net/
 languageCode: en-gb
-title: Notes about various things
-theme: ananke
+title: Notes about random things
+theme: PaperMod
 
 DefaultContentLanguage: en
-paginate: 10
+paginattion:
+  pagerSize: 10
 googleAnalytics: UA-97311821-1
 enableRobotsTXT: true
 
@@ -19,16 +20,25 @@ markup:
     lineNos: false
     lineNumbersInTable: true
     noClasses: true
-    style: monokai
+    style: catppuccin-frappe
     tabWidth: 4
   # This enables using raw HTML in markdown
   goldmark:
     renderer:
       unsafe: true
 params:
-  github: https://github.com/nickto
-  gitlab:  https://gitlab.com/nickto
-  description: >-
-    Notes about data science and related things mostly for myself.  
-  featured_image: /home/riga-header.jpg
-  disqusShortname: nickto
+  homeInfoParams:
+    Title: Hi there, here you can find some notes
+    Content: about data science and (un)related things. Mostly for myself.
+  socialIcons: # optional
+    - name: "gitlab"
+      url: https://gitlab.com/nickto
+    - name: "github"
+      url: https://github.com/nickto
+  ShowShareButtons: true
+  comments: true
+  disqusShortname: nickto0x64
+
+# services:
+#   disqus:
+#     shortname: nickto0x64

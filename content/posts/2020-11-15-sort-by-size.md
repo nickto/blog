@@ -13,14 +13,16 @@ disk usage:
 du -hs * | sort -rh
 ```
 
-### Explanation
+## Explanation
+
+### `du`
 
 `du` summarizes disk usage of files, and for directories it summarizes them
 recursively. The `-s` option tells `du` to display "only a total for each
 argument". Without it, `du` also displays recursively the sizes of each nested
 directory. So for the following file structure
 
-```
+```text
 $ tree .
 .
 ├── dir1
@@ -39,8 +41,8 @@ $ tree .
 
 `du` without `-s` would output the following
 
-```
-$ du -h * 
+```text
+$ du -h *
 260K    dir1/dir11
 516K    dir1/dir12
 908K    dir1
@@ -54,7 +56,7 @@ $ du -h *
 And `-h` options makes the sizes human readable rather than in bytes. So `du`
 without `-h` would output the following
 
-```
+```text
 $ du -s *
 908     dir1
 260     dir2
@@ -64,7 +66,7 @@ $ du -s *
 64      file4
 ```
 
-#### `sort`
+### `sort`
 
 `sort` utility sorts lines from standard input. The `-r` options tells it to
 reverse the result, i.e., sort in descending order. And the `-h` option tells it
