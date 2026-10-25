@@ -1,7 +1,7 @@
 ## Development
 
 1. Clone the repo with submodules: `git clone --recurse-submodules <url>` (or, in an existing clone, `git submodule update --init --recursive`).
-2. The Hugo version is pinned in `shell.nix` and in `netlify.toml` (`HUGO_VERSION`); keep them in sync.
+2. Hugo comes from the nixpkgs channel set in `shell.nix`; its version must match `HUGO_VERSION` in `netlify.toml`.
 3. Add `use nix` to `.envrc`; run `direnv allow`.
 4. Start the server: `hugo server --buildDrafts`.
 

@@ -3,7 +3,7 @@ publish = "public"
 command = "hugo --gc --minify"
 
 [build.environment]
-# Keep in sync with hugoVersion in shell.nix.
+# Keep in sync with the Hugo version from the nixpkgs channel in shell.nix.
 HUGO_VERSION = "0.168.0"
 
 [context.production.environment]
