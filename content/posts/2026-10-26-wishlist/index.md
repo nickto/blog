@@ -70,9 +70,20 @@ Excluded:
 
 ### [Christmas Community](https://github.com/Wingysam/Christmas-Community)
 
-423 stars. Family wishlists that prevent double-gifting, with guest viewing, Google or OIDC login and a single-list mode.
+423 stars. Family wishlists that prevent double-gifting, with guest viewing,
+OIDC login and a single-list mode.
 
-Excluded: TBD
+It is surprisingly popular given what I found, so it's quite possible I'm
+missing something.
+
+Excluded:
+
+- Very targeted: it asks for things like clothing sizes, and each user gets
+  only one list.
+- Doesn't pass my "not Web 2.0" vibe check, although I suspect the idea is
+  that you bring your own CSS.
+- Somehow too minimalistic and too bloated at the same time. Some buttons
+  don't do anything, and overall it doesn't feel like a finished product.
 
 ### [wishthis](https://github.com/wishthis/wishthis)
 
