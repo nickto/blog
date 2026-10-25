@@ -4,7 +4,7 @@ title: Notes about random things
 theme: PaperMod
 
 DefaultContentLanguage: en
-paginattion:
+pagination:
   pagerSize: 10
 enableRobotsTXT: true
 
@@ -35,9 +35,4 @@ params:
     - name: "github"
       url: https://github.com/nickto
   ShowShareButtons: true
-  comments: true
-  disqusShortname: nickto0x64
-
-services:
-  disqus:
-    shortname: nickto0x64
+  comments: false

@@ -4,3 +4,7 @@
 2. Clone all the submodules: `git submodule update --init --recursive`.
 3. Add `use nix` to `.envrc`; run `direnv allow`.
 4. Start the server: `hugo server --buildDrafts`.
+
+## TODO
+
+- Switch comments to giscus (currently disabled; Disqus removed).
