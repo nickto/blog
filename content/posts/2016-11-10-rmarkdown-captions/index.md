@@ -4,7 +4,7 @@ date: 2016-11-10T15:30:00+02:00
 draft: false
 ---
 
-[R Markdown](http://rmarkdown.rstudio.com/) is an extremely useful tool for
+[R Markdown](https://rmarkdown.rstudio.com/) is an extremely useful tool for
 producing reports using R. The problem is that decent quality reports require
 captions for figures and tables, and it is not straightforward to do. The good
 news is that it is still quite easy.
@@ -14,10 +14,10 @@ news is that it is still quite easy.
 The key to adding captions is that
 [knitr](https://cran.r-project.org/web/packages/knitr/index.html) actually
 converts your `.Rmd` file to `.md` file first, and then uses
-[pandoc](http://pandoc.org/) to conert it to html, pdf or another format.
+[pandoc](https://pandoc.org/) to conert it to html, pdf or another format.
 Therefore, everything that works in Pandoc also works in R Markdown. It is worth
 noting, though, that Pandoc uses its own extended version of Markdown called
-[Pandoc's Markdown](http://pandoc.org/MANUAL.html#pandocs-markdown). Among other
+[Pandoc's Markdown](https://pandoc.org/MANUAL.html#pandocs-markdown). Among other
 things it allows captioning your figures and tables. This is done in the
 following way for the figures
 

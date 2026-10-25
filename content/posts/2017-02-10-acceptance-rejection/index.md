@@ -269,4 +269,4 @@ multiplicative constant".
 the illustrations anymore.
 [^3]: Technically, this is not probability, because we are talking about
 continuous distributions, but this should be close enough for intuition.
-[^4]: Proof is taken from [here](http://www.columbia.edu/~ks20/4703-Sigman/4703-07-Notes-ARM.pdf) with some comments.
+[^4]: Proof is taken from [here](https://www.columbia.edu/~ks20/4703-Sigman/4703-07-Notes-ARM.pdf) with some comments.

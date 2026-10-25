@@ -5,7 +5,7 @@ draft: false
 ---
 
 Let us be honest, one of the reasons we use
-[R Markdown](http://rmarkdown.rstudio.com/) to compile documents into PDF is the
+[R Markdown](https://rmarkdown.rstudio.com/) to compile documents into PDF is the
 aesthetic pleasure provided by LaTeX. However, all the efforts can be ruined by
 wrong fonts in plots that are not the same as in the rest of the document.
 [For example](poor-fonts.pdf)

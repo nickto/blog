@@ -33,7 +33,7 @@ becomes less convenient.
 
 I mostly followed these guides, except for some specific problems:
 
-- [Deploy Nextcloud on k3s](https://greg.jeanmart.me/2020/04/13/deploy-nextcloud-on-kuberbetes--the-self-hos/)
+- [Deploy Nextcloud on k3s](https://gr3g.tech/2020/04/12/deploy-nextcloud-on-kuberbetes--the-self-hos/)
 - [k3s rocks](https://k3s.rocks/install-setup)
 - [Raspberry Pi k3s stories](https://gdha.github.io/pi-stories)
 - [Pi Kubernetes Cluster Project](https://picluster.ricsanfre.com/)
@@ -199,7 +199,7 @@ or any other suitable package manager.
 ## 4. Install MetalLB {#metallb}
 
 Here, I am mostly following
-[Greg's tutorial](https://greg.jeanmart.me/2020/04/13/install-and-configure-a-kubernetes-cluster-w/),
+[Greg's tutorial](https://gr3g.tech/2020/04/12/install-and-configure-a-kubernetes-cluster-w/),
 but some things have changed since it was written. It particular:
 
 - Helm's stable channel was [archived](https://github.com/helm/charts).
