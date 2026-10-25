@@ -91,8 +91,13 @@ Excluded:
 
 Excluded:
 
-- Adds an affiliate parameter to amazon.de links, which can't be turned off.
-- No longer maintained.
+- Adds an affiliate parameter to amazon.de links, and there's no way to turn it
+  off. This is what ruled it out when I first looked into this a couple of
+  years ago.
+- Since then, it has also stopped being maintained.
+
+Either one is a deal breaker, so I didn't look any further, even though it
+seems like a polished product.
 
 ### [Pønskelisten](https://github.com/aunefyren/poenskelisten)
 
