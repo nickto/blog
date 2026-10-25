@@ -3,7 +3,6 @@ title:  "Acceptance-rejection method for generating random variables"
 date:   2017-02-10T20:40:00+02:00
 draft: false
 math: true
-staticPath: /posts/2017-02-10-acceptance-rejection
 ---
 
 [Acceptance-rejection method](https://en.wikipedia.org/wiki/Rejection_sampling)
@@ -30,7 +29,7 @@ $$`
 
 then $ c g(x)$ is called the _majorizing distribution_.
 
-![Distributions.]({{< static_path >}}/example_1_edited.svg)
+![Distributions.](example_1_edited.svg)
 
 ### Draw a number
 
@@ -42,7 +41,7 @@ get some approximation.
 
 So, let us say that the value of $ y $ appeared to be the following[^2]:
 
-![Realizations.]({{< static_path >}}/example_3_edited.svg)
+![Realizations.](example_3_edited.svg)
 
 ### Decide whether to accept or reject it
 
@@ -65,7 +64,7 @@ proportion of cases: there is $ cg(y) $ probability[^3] to draw this number, but
 we wanted it to draw only with probability $ f(y) $. This makes much more sense
 when we visualize it:
 
-![Why this fraction?]({{< static_path >}}/example_4_edited.svg)
+![Why this fraction?](example_4_edited.svg)
 
 Note that because we have chosen the majorizing distribution to be greater or
 equal to the target one, the described fraction is always between 0 and 1:
@@ -91,7 +90,7 @@ otherwise reject it.
 
 Let us visualize it. Let us consider 3 possible values of $ u $:
 
-![Accepting and rejecting.]({{< static_path >}}/example_5_edited.svg)
+![Accepting and rejecting.](example_5_edited.svg)
 
 For values $ u_2 $ and $ u_3 $ we would reject $ y $ and for the value $ u_1 $
 ---accept it. All values of $ u_i $ are equally likely to appear. Moreover,

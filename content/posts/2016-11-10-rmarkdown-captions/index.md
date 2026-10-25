@@ -2,7 +2,6 @@
 title: "Table and figure captions in R Markdown"
 date: 2016-11-10T15:30:00+02:00
 draft: false
-staticPath: /posts/2016-11-10-rmarkdown-captions
 ---
 
 [R Markdown](http://rmarkdown.rstudio.com/) is an extremely useful tool for
@@ -74,7 +73,7 @@ Table: Example of a table with a caption. Note, that there is an empty line
 before this caption. \label{tab:example-table}
 ```
 
-[This]({{< static_path >}}/pandoc-example.pdf) is how it looks after compiling
+[This](pandoc-example.pdf) is how it looks after compiling
 it to pdf (in the command line:
 
 ```bash
@@ -83,7 +82,7 @@ pandoc pandoc-example.md -o pandoc-example.pdf`
 
 where `pandoc-example.md` is our Markdown input, and we want a PDF output):
 
-![]({{< static_path >}}/pandoc-example-screenshot.png)
+![](pandoc-example-screenshot.png)
 
 
 ## R Markdown: combining both
@@ -145,9 +144,8 @@ obviously, results in a double backslash.
 ### Result
 
 Combining the table and the figure examples, we get the something like
-[this]({{< static_path >}}/rmarkdown-example.pdf):
+[this](rmarkdown-example.pdf):
 
-![Screenshot of example]({{< static_path >}}/rmarkdown-example-screenshot.png)
+![Screenshot of example](rmarkdown-example-screenshot.png)
 
-A reproducible example of the image above can be fount [here]({{< static_path
->}}/rmarkdown-example.Rmd).
+A reproducible example of the image above can be fount [here](rmarkdown-example.Rmd).

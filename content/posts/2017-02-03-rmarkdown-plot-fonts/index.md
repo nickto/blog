@@ -2,22 +2,21 @@
 title:  "LaTeX fonts in R Markdown plots"
 date:   2017-02-03T19:30:00+01:00
 draft: false
-staticPath: /posts/2017-02-03-rmarkdown-plot-fonts
 ---
 
 Let us be honest, one of the reasons we use
 [R Markdown](http://rmarkdown.rstudio.com/) to compile documents into PDF is the
 aesthetic pleasure provided by LaTeX. However, all the efforts can be ruined by
 wrong fonts in plots that are not the same as in the rest of the document.
-[For example]({{< static_path >}}/poor-fonts.pdf)
+[For example](poor-fonts.pdf)
 
-![These are some ugly fonts!]({{< static_path >}}/poor-fonts-screenshot.png)
+![These are some ugly fonts!](poor-fonts-screenshot.png)
 
 Well, these are some ugly fonts (not by itself, but in combination with the rest
 of the document). Would not it be much better to have something like
-[this]({{< static_path >}}/good-fonts.pdf)?
+[this](good-fonts.pdf)?
 
-![These are some nice fonts!]({{< static_path >}}/good-fonts-screenshot.png)
+![These are some nice fonts!](good-fonts-screenshot.png)
 
 So how can we make the good ones? Well, the answer is easy: just let LaTeX
 render your images and it will take care of the rest.
@@ -65,7 +64,7 @@ plot(rnorm(10), rnorm(10))
 ## Reproducible example
 
 Reproducible example can be found
-[here]({{< static_path >}}/good-fonts.Rmd).
+[here](good-fonts.Rmd).
 
 ## TL; DR
 
