@@ -1,6 +1,6 @@
 baseURL: https://blog.nickto.net/
 locale: en-GB
-title: Notes about random things
+title: Field notes
 theme: PaperMod
 
 DefaultContentLanguage: en
@@ -27,8 +27,8 @@ markup:
       unsafe: true
 params:
   homeInfoParams:
-    Title: Hi there, here you can find some notes
-    Content: about data science and (un)related things. Mostly for myself.
+    Title: Notes on things I built or figured out
+    Content: Small projects, experiments, and the occasional how-to, written down so I don't lose them.
   socialIcons: # optional
     - name: "gitlab"
       url: https://gitlab.com/nickto
