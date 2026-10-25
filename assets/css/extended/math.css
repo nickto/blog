@@ -1,3 +1,12 @@
+/* Math is written inside <code> so Markdown leaves it alone; once MathJax
+   has typeset it, drop the code styling around the result */
+.has-jax {
+  -webkit-font-smoothing: antialiased;
+  background: inherit !important;
+  border: none !important;
+  font-size: 1em;
+}
+
 /* Let wide display math scroll instead of overflowing */
 mjx-container {
   overflow-x: auto;

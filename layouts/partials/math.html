@@ -6,8 +6,19 @@
       processEscapes: true,
       processEnvironments: true,
       tags: 'ams'
+    },
+    options: {
+      // Unlike MathJax's default, do not skip <code>: the math in the posts
+      // is written inside backticks so that Markdown leaves it alone.
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
     }
   };
+
+  window.addEventListener('load', () => {
+    document.querySelectorAll('mjx-container').forEach((x) => {
+      x.parentElement.classList.add('has-jax');
+    });
+  });
 </script>
 <script id="MathJax-script" async
   src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-chtml.js"></script>
