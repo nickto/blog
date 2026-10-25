@@ -2,6 +2,7 @@
 title:  "Acceptance-rejection method for generating random variables"
 date:   2017-02-10T20:40:00+02:00
 draft: false
+math: true
 staticPath: /posts/2017-02-10-acceptance-rejection
 ---
 

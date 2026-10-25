@@ -1,0 +1,6 @@
+/* Let wide display math scroll instead of overflowing */
+mjx-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
