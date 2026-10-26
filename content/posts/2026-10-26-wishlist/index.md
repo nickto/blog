@@ -137,32 +137,6 @@ Excluded:
 - You can set a desired quantity for an item but can't claim more than one.
 - Many options (brands, labels, filters, ratings, currency management) that aren't needed and aren't well thought through; it feels vibe-coded.
 
-### [wysh](https://github.com/hamaluik/wysh)
-
-3 stars. Google or Facebook login, friends, and private, friends-only or public lists.
-
-Excluded:
-
-- The last commit was 9 years ago.
-
-### [Super-Simple-Wishlist](https://github.com/ghomasHudson/Super-Simple-Wishlist)
-
-3 stars. Renders a plaintext file of URLs as a wishlist and tracks when someone buys something.
-
-Excluded: TBD
-
-### [wishlist-app](https://github.com/Superior-Kqller/wishlist-app)
-
-1 star. A small Next.js and Prisma wishlist app.
-
-Excluded: TBD
-
-### [Wishlist](https://github.com/SantiagoVargasVe/wishlist) by SantiagoVargasVe
-
-0 stars. Paste a product link, share the list, and let people mark items as bought without spoiling the surprise.
-
-Excluded: TBD
-
 ## Lessons from the existing solutions
 
 - No admin page please.
