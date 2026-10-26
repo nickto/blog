@@ -2,6 +2,8 @@
 title: "Wishlist"
 date: 2026-10-25T21:38:53+02:00
 draft: true
+ShowToc: true
+TocOpen: true
 ---
 
 ## Why a wishlist?
@@ -175,22 +177,27 @@ claim without an account, and quantities are supported.
 Why it's not for me:
 
 - The admin has to register users.
-- You can set a desired quantity for an item, but each click claims just one.
+- You can set a desired quantity for an item, but each click claims just one. Not a deal breaker on its own, but feels a bit raw.
 - Many options (brands, labels, filters, ratings, currency management) that
   I don't need, and they make the app feel cluttered rather than focused.
 
 ## Lessons from the existing solutions
 
-- No admin page please.
-- No specific holiday theme.
-- Does not look like web 2.0.
-- No referral links.
-- Releasing a claim matters. Many apps get it wrong: either there is no undo,
-  or anyone can undo anyone's claim.
-- Public and claimable should go together. Most apps make you pick one.
+Going through these apps added a few things to my list:
+
+- **No admin.** Owners manage their own lists and settings. Nobody should have
+  to create accounts or flip global switches for them.
+- **No holiday theme.** Wishlists are for birthdays and weddings too, not just
+  Christmas.
+- **No Web 2.0 look.**
+- **No affiliate links.**
+- **Releasing a claim matters.** Many apps get it wrong: either a claim can't
+  be undone, or anyone can undo anyone's claim.
+- **Public lists should be claimable.** Most apps make you choose between a
+  public list and one people can claim items from.
 
 ## Building my own
 
 - Simple and minimalistic in GUI and backend.
 - The owner of the lists decides whether they want to see what is already
-  reserved.
+  reserved: some people don't like surprises and it's up to them to decide.
