@@ -4,35 +4,37 @@ date: 2026-10-25T21:38:53+02:00
 draft: true
 ---
 
-Everyone who learns how to (vibe) code seems to build a calculator, a weather
-app and a wishlist app.
-
 ## Why a wishlist?
 
-Wishlists simplify our lives and mean less waste and fewer dust-collectors by
-making sure that the gift is actually desired.
+Wishlists make gift-giving easier. Givers don't have to guess, and recipients
+get something they actually want instead of another dust collector. Less
+guessing means less dust collecting shelfware.
 
-But what if I want to be surprised? As long as your list is long enough and you
-don't know what exactly you are going to receive and from whom, I'd argue that
-there is plenty of room for surprise. And if you don't like giving items from
-the wishlist, nobody forces you to do so.
+But what about surprises? If the list is long enough, you don't know exactly
+what you'll get or from whom, so there is still plenty of room for surprise.
+And if you'd rather not pick a gift from someone's wishlist, nobody forces you
+to.
 
 ## What I need
 
-My initial requirements before starting to build my own solution.
+These were my requirements before I started building my own solution.
 
-- Share lists publicly or with OIDC that basically everyone already has: if you
-  need to register on yet another service, the chances that people will actually
-  use it are slim.
-- Reserve/release: publishing a static list is easy, but not very useful. Also,
-  the release seems important. At least in my case it happened quite often that I
-  was focused on gifting one thing, but could not find it, so had to bail.
-- Reservations are visible to people trying to reserve, so that there is no
-  overlap.
-- Reservations are not visible to the owner of the list, so that they can be
-  surprised.
-- Simple and minimalistic in both UI and functionality.
-- Maintained, duh.
+**No new accounts.** Lists should be shareable via a public link or via OIDC
+with a provider that basically everyone already has. If people have to register
+on yet another service, the chances that they will actually use it are slim.
+
+**Reserving and releasing items.** Publishing a static list is easy, but not
+very useful: givers need to mark what they are getting.
+
+- Reservations are visible to other givers, so two people don't buy the same
+  thing.
+- Reservations are hidden from the list owner, so they can still be surprised.
+- Reservations can be released. It has happened to me more than once that I
+  settled on a gift but couldn't find it anywhere and had to give up on it.
+
+**Simple.** Minimalistic in both UI and functionality.
+
+**Maintained.** Duh.
 
 ## Existing solutions
 
@@ -41,10 +43,8 @@ I have a homelab running k3s. And a bunch of services there use Helm charts by
 checked. But there was no single wishlist app.
 
 So I turned to Google: the first time I looked into this was a few years ago,
-so one would still use a search engine instead of an LLM.
-
-Overall, it looks like there are two generic and polished solutions, and the
-rest is mostly targeting a very specific use case.
+so one would still use a search engine instead of an LLM. While doing that,
+I discovered that wishlists are probably the most popular type of apps after calculators and weather apps. Yet, a couple of them genuinly look like generic and polished solutions. While the rest is mostly targeting a very specific use case.
 
 ### [Wishlist](https://github.com/cmintey/wishlist) by cmintey
 
@@ -56,21 +56,22 @@ details fetched from a URL and OIDC login.
 Honestly, had I found it the first time I looked, I would probably have been
 satisfied. Still, a few things make it not quite what I want.
 
-Excluded:
+What I liked: it's the most complete of the lot and actively developed by many
+contributors. Claiming and unclaiming are one click, quantities are handled
+properly, and claims are hidden from owners by default.
 
-- Whether owners can see claims on their lists is up to the admin, not the
-  owner. Worse, it's a single global setting: once the admin turns it on, every
-  owner sees what has been claimed.
-- Group membership changes how the app behaves. Members can make suggestions
-  on other people's lists (this can be turned off) and see every list in the
-  group, which is more than a simple wishlist needs.
-- Anyone can claim items on a public list anonymously, and there is no way to
-  require a login. Anonymous claims, however, can't be undone.
-- Arguably, a bit bloated: suggestions, list managers, claiming your own items,
-  managing lists on behalf of others, a "most wanted" flag, and separate
-  "claimed" and "purchased" states. To be fair, all of them make sense in certain
-  contexts, and you can simply ignore the ones you don't need. I'd still prefer to
-  be able to turn them off so they don't clutter the UI.
+Why it's not for me:
+
+- Whether owners see claims is a single global admin setting, not the owner's
+  choice: once it's on, every owner sees what has been claimed.
+- Groups do more than I need: members see every list in the group and can
+  suggest items on other people's lists (this can be turned off).
+- Anyone can claim items on a public list anonymously, with no option to
+  require a login, and anonymous claims can't be undone.
+- More features than I need: suggestions, list managers, claiming your own
+  items, a "most wanted" flag, separate "claimed" and "purchased" states. They
+  are genuinely useful, just not to me, and since most can't be turned off,
+  they only add clutter.
 
 ### [Christmas Community](https://github.com/Wingysam/Christmas-Community)
 
@@ -82,7 +83,10 @@ can't. It also supports guest viewing, OIDC login and a single-list mode.
 It is surprisingly popular given what I found, so it's quite possible I'm
 missing something.
 
-Excluded:
+What I liked: pledging and unpledging are one click, an item can't be pledged
+twice, owners never see pledges, and OIDC login works with any provider.
+
+Why it's not for me:
 
 - Very targeted: it asks for things like clothing sizes, and each user gets
   only one list.
@@ -99,7 +103,10 @@ Excluded:
 register and create lists, and anyone with the link can view a list and mark
 wishes as fulfilled without an account.
 
-Excluded:
+What I liked: givers just open the link and mark a wish as fulfilled, no account
+needed. It's also polished, with many translations and several lists per user.
+
+Why it's not for me:
 
 - Adds an affiliate parameter to amazon.de links, and there's no way to turn it
   off. This is what ruled it out when I first looked into this a couple of
@@ -115,7 +122,11 @@ seems like a polished product.
 Owners share lists with groups, and group members claim gifts. Login is by
 password or OIDC.
 
-Excluded:
+What I liked: reserve and release are done right. There's one claim per item,
+the claimer can release it, and the owner never sees claims. It's also actively
+maintained, with OIDC, two-factor authentication and session management.
+
+Why it's not for me:
 
 - Items on public lists can't be claimed.
 - So one needs not only to register, but also to be added to a group.
@@ -127,7 +138,10 @@ Excluded:
 47 stars. A single-container app for one household: one admin creates lists
 for everyone, shares them by URL, and friends claim items without an account.
 
-Excluded:
+What I liked: it's genuinely simple. It's a single container, givers don't need
+an account, and claimed items are hidden from other visitors by default.
+
+Why it's not for me:
 
 - A different goal: managing a wishlist within a close group, such as a
   family, where everyone can do and see everything.
@@ -138,7 +152,10 @@ Excluded:
 44 stars. One wishlist per instance for a birthday, Christmas or wedding. The
 owner adds items on an admin page, and visitors mark them as purchased.
 
-Excluded:
+What I liked: it does what it says, with one list and a few fields, set up in
+minutes.
+
+Why it's not for me:
 
 - Anyone can mark an item as purchased, and anyone can undo it.
 - No commits in the last year.
@@ -152,12 +169,15 @@ are auto-filled from a product URL.
 The closest to what I want: it's the only one where the owner decides whether
 to see claims (as long as the admin allows it).
 
-Excluded:
+What I liked: besides that, claimer names are hidden from other guests, guests
+claim without an account, and quantities are supported.
+
+Why it's not for me:
 
 - The admin has to register users.
 - You can set a desired quantity for an item, but each click claims just one.
 - Many options (brands, labels, filters, ratings, currency management) that
-  aren't needed and aren't well thought through; it feels vibe-coded.
+  I don't need, and they make the app feel cluttered rather than focused.
 
 ## Lessons from the existing solutions
 
