@@ -43,6 +43,9 @@ checked. But there was no single wishlist app.
 So I turned to Google: the first time I looked into this was a few years ago,
 so one would still use a search engine instead of an LLM.
 
+Overall, it looks like there are two generic and polished solutions, and the
+rest is mostly targeting a very specific use case.
+
 ### [Wishlist](https://github.com/cmintey/wishlist) by cmintey
 
 672 stars. Self-hosted wishlists shared with friends and family or a public
@@ -101,12 +104,14 @@ seems like a polished product.
 
 ### [Pønskelisten](https://github.com/aunefyren/poenskelisten)
 
-214 stars. Group wishlists with anonymous claiming, password or OIDC login and optional TOTP.
+214 stars. Group wishlists with anonymous claiming, and password or OIDC login.
 
 Excluded:
 
 - Items on public lists can't be claimed.
-- Registration through individual invite links is confusing (it may be configurable).
+- So one needs not only to register, but also to be added to a group.
+- On top of that registration through individual invite links is confusing,
+  although OIDC login should alleviate this.
 
 ### [Wishlist](https://github.com/Reggio-Digital/wishlist) by Reggio-Digital
 
