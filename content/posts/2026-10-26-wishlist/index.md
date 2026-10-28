@@ -6,38 +6,40 @@ ShowToc: true
 TocOpen: true
 ---
 
-## Why a wishlist
+TL;DR I built a small wishlist app: hx-wish. Check it out [on
+GitLab](https://gitlab.com/nickto/hx-wish) or [in the
+wild](https://wishlist.lv).
 
-Wishlists make gift-giving easier. Givers don't have to guess, and recipients
-get something they actually want instead of another dust collector.
+## Why
 
-But what about surprises? If the list is long enough, you don't know exactly
-what you'll get or from whom, so there is still plenty of room for surprise.
-And if you'd rather not pick a gift from someone's wishlist, nobody forces you
-to.
+Last year, I shared my wishlist as a non-interactive text, and two friends ended
+up gifting me the same thing. That was awkward. 
+
+An interactive wishlist where people can mark what they want to gift sounds like
+something that should already exist. It kinda does, but it is bit more nuanced.
+In short, it turns out that people disagree on what it should do.
 
 ## What I need
 
-These were my requirements before I started building my own solution.
-
-**No new accounts.** Lists should be shareable via a public link or via OIDC
-with a provider that basically everyone already has. If people have to register
-on yet another service, the chances that they will actually use it are slim.
+I think like I don't need much
 
 **Reserving and releasing items.** Publishing a static list is easy, but not
 very useful: givers need to mark what they are getting.
 
-- Reservations are visible to other givers, so two people don't buy the same
-  thing.
-- Reservations are hidden from the list owner, so they can still be surprised.
-- Reservations can be released. It has happened to me more than once that I
-  settled on a gift but couldn't find it anywhere and had to give up on it.
+- Reservations are visible to other givers: that's what started this whole endeavor.
+- Reservations can be released. My fingers are fat, I can misclick. I also might
+  overestimate my chances of finding the thing.
+- Reservations are hidden from the list owner, so they can still be surprised
+  (if they want).
 
 **Simple.** Minimalistic in both UI and functionality.
 
+**No new accounts.** If people have to register on yet another service, they'll
+just ignore it.
+
 **Maintained.** Duh.
 
-## Existing solutions
+## What I found
 
 I have a homelab running k3s. And a bunch of services there use Helm charts by
 [TrueCharts](https://truecharts.org/), so naturally, it was the first place I
@@ -46,8 +48,9 @@ checked. But there was no single wishlist app.
 So I turned to Google. The first time I looked was a few years ago, back when
 people still searched instead of asking an LLM. Wishlists seem to be one of the
 most popular hobby projects, right after calculators and weather apps. Yet only
-a couple of them look like genuinely polished, general-purpose apps: most target
-one specific use case.
+a couple of them look like genuinely polished, general-purpose apps. Yet,
+each of them had a deal breaker. And some of them had pitfalls, which I haven't 
+event though of before reviewing them.
 
 {{< collapse summary="Expand to see the detailed overview of the existing solutions" openByDefault=false >}}
 
@@ -186,7 +189,7 @@ Why it's not for me:
 
 {{< /collapse >}}
 
-## Lessons from the existing solutions
+## Updating what I need
 
 Going through these apps added a few things to my list:
 
@@ -194,18 +197,23 @@ Going through these apps added a few things to my list:
   Nobody should have to create accounts or flip global switches for them.
 - **No holiday theme.** Wishlists are for birthdays and weddings too, not just
   Christmas.
-- **No Web 2.0 look.**
-- **No affiliate links.**
-- **Releasing a claim matters.** Many apps get it wrong: either a claim can't
+- **No affiliate links.** I would have expected this from commercial solutions,
+  but suprisingly even self-hosted open source apps have those. A deal breaker
+  for me.
+- **No Web 2.0 look.** Subjective, I agree.
+- **Release mechanism matters.** Many apps get it wrong: either a claim can't
   be undone, or anyone can undo anyone's claim.
 - **Public lists should be claimable.** Most apps make you choose between a
-  public list and one people can claim items from.
+  public list and one people can claim items from (and then you have to add them
+  to groups, manage access, and take a new part-time ProdOps job).
 
-## Building my own
+## Building what I need
 
 So I built [hx-wish](https://gitlab.com/nickto/hx-wish). The idea is to keep it
 simple and minimalistic, both in the UI and in the backend, and to take the
 lessons above literally.
+
+### Main features
 
 **No admin.** There is no admin role and no global switches. Anyone who logs in
 can create lists, and everything about a list is decided by its owner.
@@ -249,7 +257,7 @@ the links again when you go shopping.
 
 ![My reservations page with items grouped under two different lists](hxwish-my-reservations-multiple.png)
 
-### The details that are not obvious
+### Gotchas
 
 The basic flow is simple, but a few situations turned out to be trickier than
 they looked.
@@ -359,7 +367,7 @@ of boilerplate I didn't have to write or maintain.
 
 ## Try it
 
-- Source: [hx-wish on GitLab](https://gitlab.com/nickto/hx-wish)
+- Source: [hx-wish on GitLab](https://gitlab.com/nickto/hx-wish).
 - Docker image:
 
   ```sh
