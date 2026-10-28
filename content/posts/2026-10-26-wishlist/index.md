@@ -1,5 +1,5 @@
 ---
-title: "Building the wishlist app I couldn't find"
+title: "hx-wish: yet another wishlist app"
 date: 2026-10-25T21:38:53+02:00
 draft: true
 ShowToc: true
@@ -12,23 +12,25 @@ wild](https://wishlist.lv).
 
 ## Why
 
-Last year, I shared my wishlist as a non-interactive text, and two friends ended
-up gifting me the same thing. That was awkward. 
+Last year, I shared my wishlist as a plain text list, and two friends ended
+up gifting me the same thing. That was awkward.
 
 An interactive wishlist where people can mark what they want to gift sounds like
-something that should already exist. It kinda does, but it is bit more nuanced.
-In short, it turns out that people disagree on what it should do.
+something that should already exist. It kinda does, but it is a bit more
+nuanced. In short, it turns out that people disagree on what it should do. And I
+have my own strong opinions, too.
 
 ## What I need
 
-I think like I don't need much
+I thought I didn't need much:
 
 **Reserving and releasing items.** Publishing a static list is easy, but not
 very useful: givers need to mark what they are getting.
 
-- Reservations are visible to other givers: that's what started this whole endeavor.
-- Reservations can be released. My fingers are fat, I can misclick. I also might
-  overestimate my chances of finding the thing.
+- Reservations are visible to other givers: that's what started this whole
+  endeavor.
+- Reservations can be released. My fingers are fat; I can misclick. I also
+  might overestimate my chances of finding the thing.
 - Reservations are hidden from the list owner, so they can still be surprised
   (if they want).
 
@@ -47,10 +49,10 @@ checked. But there was no single wishlist app.
 
 So I turned to Google. The first time I looked was a few years ago, back when
 people still searched instead of asking an LLM. Wishlists seem to be one of the
-most popular hobby projects, right after calculators and weather apps. Yet only
-a couple of them look like genuinely polished, general-purpose apps. Yet,
-each of them had a deal breaker. And some of them had pitfalls, which I haven't 
-event though of before reviewing them.
+most popular hobby projects, right after calculators and weather apps. Only a
+couple of them look like genuinely polished, general-purpose apps. Yet each of
+them had a deal breaker. And some of them had pitfalls I hadn't even thought of
+before reviewing them.
 
 {{< collapse summary="Expand to see the detailed overview of the existing solutions" openByDefault=false >}}
 
@@ -183,7 +185,8 @@ claim without an account, and quantities are supported.
 Why it's not for me:
 
 - The admin has to register users.
-- You can set a desired quantity for an item, but each click claims just one. Not a deal breaker on its own, but feels a bit raw.
+- You can set a desired quantity for an item, but each click claims just one.
+  Not a deal breaker on its own, but feels a bit raw.
 - Many options (brands, labels, filters, ratings, currency management) that
   I don't need, and they make the app feel cluttered rather than focused.
 
@@ -198,20 +201,20 @@ Going through these apps added a few things to my list:
 - **No holiday theme.** Wishlists are for birthdays and weddings too, not just
   Christmas.
 - **No affiliate links.** I would have expected this from commercial solutions,
-  but suprisingly even self-hosted open source apps have those. A deal breaker
+  but surprisingly even self-hosted open source apps have those. A deal breaker
   for me.
 - **No Web 2.0 look.** Subjective, I agree.
 - **Release mechanism matters.** Many apps get it wrong: either a claim can't
   be undone, or anyone can undo anyone's claim.
 - **Public lists should be claimable.** Most apps make you choose between a
   public list and one people can claim items from (and then you have to add them
-  to groups, manage access, and take a new part-time ProdOps job).
+  to groups, manage access, and take a new part-time sysadmin job).
 
 ## Building what I need
 
 So I built [hx-wish](https://gitlab.com/nickto/hx-wish). The idea is to keep it
 simple and minimalistic, both in the UI and in the backend, and to take the
-lessons above literally.
+updated requirements literally.
 
 ### Main features
 
@@ -393,4 +396,4 @@ of boilerplate I didn't have to write or maintain.
 ## Closing thoughts
 
 It's a simple app, and I kept it that way on purpose. I hope it spares someone
-at least one dust collector, or one awkward moment.
+at least one duplicate gift, or one awkward moment.
