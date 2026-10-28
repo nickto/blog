@@ -339,3 +339,58 @@ completely: the chart's only template is a single line,
 and everything else (Deployment, init container for migrations, Service,
 Ingress, PVC, probes) is about a hundred lines of `values.yaml`. That's a lot
 of boilerplate I didn't have to write or maintain.
+
+## What it looks like
+
+Here is a quick tour of hx-wish.
+
+Login is OAuth only, so there is nothing to register:
+
+![Login page with Google, Microsoft, GitHub and GitLab buttons](hxwish-login.png)
+
+The owner's list. Items can have a link and a note, and can be reordered by
+dragging. Reservations are hidden from the owner by default:
+
+![Owner's list with reservations hidden](hxwish-owner-list.png)
+
+The owner can opt in to see which items are reserved, but not by whom:
+
+![Owner's list with "View reserved" on, two items marked as reserved](hxwish-owner-list-reserved.png)
+
+The "My reservations" page lists everything I have reserved across all lists.
+If the owner edits an item after I reserved it, I see what I originally
+reserved next to the new version:
+
+![My reservations page, with a "changed by the owner" notice on one item](hxwish-my-reservations.png)
+
+When the owner regenerates a share link, the old one stops working and says so:
+
+![Retired share link message](hxwish-retired-link.png)
+
+## Try it
+
+- Source: [hx-wish on GitLab](https://gitlab.com/nickto/hx-wish)
+- Docker image:
+
+  ```sh
+  docker pull rg.pl-waw.scw.cloud/nickto/hx-wish
+  ```
+
+- Helm chart (OCI):
+
+  ```sh
+  helm pull oci://rg.pl-waw.scw.cloud/nicktocharts/hx-wish --version 1.1.0
+  ```
+
+- Hosted: I also run it at [wishlist.lv](https://wishlist.lv). It's not a demo
+  but a regular instance, so just log in with Google, Microsoft, GitHub or
+  GitLab and create a list. It's free, and I run it for myself and friends, so
+  no guarantees. That said, if someone besides me starts using it, I will
+  probably keep paying for the domain. The data is not end-to-end encrypted, and
+  technically I can read it, so if privacy matters to you, self-host it.
+
+## Closing thoughts
+
+It's a simple app, and I kept it that way on purpose: making it look good on
+every screen size adds complexity, so some things look rough on mobile. Still, I
+hope it saves at least one dust collector, or one awkward moment.
