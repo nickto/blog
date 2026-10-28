@@ -39,6 +39,8 @@ very useful: givers need to mark what they are getting.
 **No new accounts.** If people have to register on yet another service, they'll
 just ignore it.
 
+**Open source.** No prying eyes on my list.
+
 **Maintained.** Duh.
 
 ## What I found
