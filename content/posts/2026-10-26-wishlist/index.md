@@ -48,6 +48,8 @@ So I turned to Google: the first time I looked into this was a few years ago,
 so one would still use a search engine instead of an LLM. While doing that,
 I discovered that wishlists are probably the most popular type of apps after calculators and weather apps. Yet, a couple of them genuinly look like generic and polished solutions. While the rest is mostly targeting a very specific use case.
 
+{{< collapse summary="Expand to see the detailed overview of the existing solutions" openByDefault=false >}}
+
 ### [Wishlist](https://github.com/cmintey/wishlist) by cmintey
 
 672 stars. Wishlists for friends and family. Everyone has an account, and users
@@ -180,6 +182,8 @@ Why it's not for me:
 - You can set a desired quantity for an item, but each click claims just one. Not a deal breaker on its own, but feels a bit raw.
 - Many options (brands, labels, filters, ratings, currency management) that
   I don't need, and they make the app feel cluttered rather than focused.
+
+{{< /collapse >}}
 
 ## Lessons from the existing solutions
 
