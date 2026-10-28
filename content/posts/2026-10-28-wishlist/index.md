@@ -1,7 +1,7 @@
 ---
 title: "hx-wish: yet another wishlist app"
 date: 2026-10-28T21:26:00+02:00
-draft: true
+draft: false
 ShowToc: true
 TocOpen: true
 ---
