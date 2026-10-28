@@ -293,3 +293,45 @@ link they already had.
 The first version said "Ask <owner's name>", until I realised that it leaks the
 owner's name to exactly the people they might have wanted to cut off.
 
+## Tech
+
+**HTMX.** I hadn't heard of [HTMX](https://htmx.org) before this project, and
+it's the reason for the name: all its attributes start with `hx-`. The idea is
+simple: the server returns HTML, and attributes on elements say which bit of
+the page to replace with it. No frontend framework, no build step, no JSON API.
+For an app like this, it is exactly enough. The backend is FastAPI with Jinja
+templates and SQLite.
+
+**From Pico.css to Beer CSS.** I started with [Pico.css](https://picocss.com),
+which styles plain semantic HTML with almost no classes. It got me surprisingly
+far, but I kept running into things it didn't have, like menus, snackbars and
+proper dialogs, and had to workaround it. On top of that, Pico [stopped being
+maintained](https://picocss.com/docs/maintenance) recently. So I moved to
+[Beer CSS](https://www.beercss.com), which implements Material Design 3 and has
+the components I need. As a bonus, it passes my own "not Web 2.0" check well.
+
+## Deployment
+
+**Docker.** The app ships as a Docker image. A small remark for anyone building
+Python images for Kubernetes: I started with Alpine, and login broke in the
+cluster because the pod couldn't resolve Google's OAuth host. musl's resolver
+gives up on lookups that glibc retries, which matters with Kubernetes'
+`ndots:5`. Switching to a Debian-based image fixed it.
+
+**Docker Compose.** For the "just try it" route there is a
+`docker-compose.yaml`: one service, SQLite on a volume, secrets in a `.env`
+file, migrations on start. `docker compose up -d` and that's it.
+
+**Helm.** My homelab runs k3s, so I also wanted a Helm chart. I used to rely on
+TrueCharts (see above), but the [bjw-s common library
+chart](https://github.com/bjw-s-labs/helm-charts) seems to be more widely
+adopted. For a simple app it removes the need to write your own manifests
+completely: the chart's only template is a single line,
+
+```yaml
+{{- include "bjw-s.common.loader.all" . }}
+```
+
+and everything else (Deployment, init container for migrations, Service,
+Ingress, PVC, probes) is about a hundred lines of `values.yaml`. That's a lot
+of boilerplate I didn't have to write or maintain.
