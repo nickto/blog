@@ -1,6 +1,6 @@
 ---
 title: "hx-wish: yet another wishlist app"
-date: 2026-10-25T21:38:53+02:00
+date: 2026-10-28T21:26:00+02:00
 draft: true
 ShowToc: true
 TocOpen: true
@@ -28,7 +28,7 @@ I thought I didn't need much:
 very useful: givers need to mark what they are getting.
 
 - Reservations are visible to other givers: that's what started this whole
-  endeavor.
+  endeavour.
 - Reservations can be released. My fingers are fat; I can misclick. I also
   might overestimate my chances of finding the thing.
 - Reservations are hidden from the list owner, so they can still be surprised
@@ -39,7 +39,7 @@ very useful: givers need to mark what they are getting.
 **No new accounts.** If people have to register on yet another service, they'll
 just ignore it.
 
-**Open source.** No prying eyes on my list.
+**Open source** (and self-hostable). No prying eyes on my wishes, please.
 
 **Maintained.** Duh.
 
@@ -47,7 +47,7 @@ just ignore it.
 
 I have a homelab running k3s. And a bunch of services there use Helm charts by
 [TrueCharts](https://truecharts.org/), so naturally, it was the first place I
-checked. But there was no single wishlist app.
+checked. But there wasn't a single wishlist app.
 
 So I turned to Google. The first time I looked was a few years ago, back when
 people still searched instead of asking an LLM. Wishlists seem to be one of the
@@ -80,7 +80,7 @@ Why it's not for me:
   suggest items on other people's lists (this can be turned off).
 - Anyone can claim items on a public list anonymously, with no option to
   require a login, and anonymous claims can't be undone.
-- More features than I need: suggestions, list managers, claiming your own
+- Lots of extras: suggestions, list managers, claiming your own
   items, a "most wanted" flag, separate "claimed" and "purchased" states. They
   are genuinely useful, just not to me, and since most can't be turned off,
   they only add clutter.
@@ -104,8 +104,8 @@ Why it's not for me:
   only one list.
 - Public lists are view-only, and they show what has been pledged, so the owner
   can see it too.
-- Doesn't pass my "not Web 2.0" vibe check, although I suspect the idea is
-  that you bring your own CSS.
+- Looks very Web 2.0, although I suspect the idea is that you bring your own
+  CSS.
 - Somehow too minimalistic and too bloated at the same time. Some buttons
   don't do anything, and overall it doesn't feel like a finished product.
 
@@ -125,8 +125,7 @@ Why it's not for me:
   years ago.
 - Since then, it has also stopped being maintained.
 
-Either one is a deal breaker, so I didn't look any further, even though it
-seems like a polished product.
+Either one is a deal breaker, so I didn't look any further.
 
 **[Pønskelisten](https://github.com/aunefyren/poenskelisten)**
 
@@ -234,13 +233,13 @@ an item.
 ![Owner's list with "View reserved" on, two items marked as reserved](hxwish-owner-list-reserved.png)
 
 **Shared lists accept reservations.** Every list has a share link, and anyone
-who opens it can reserve items. Reserving and cancelling the reservation is just
-one click away.
+who opens it can reserve items. Reserving and releasing are each just one
+click.
 
 ![Shared list view with Reserve buttons and one item reserved by the viewer](hxwish-shared-list.png)
 
-**Only you can release your reservation.** Nobody else can release your
-reservation, not even the owner.
+**Only you can release your reservation.** Nobody else can release it, not even
+the owner.
 
 ![Shared list as seen by another person, with an item marked "Reserved" and no button](hxwish-shared-list-other-reserved.png)
 
@@ -281,7 +280,7 @@ used to say "blue"? Do you have memory issues? Are you going insane? Maybe. I'm
 not a doctor. But what I can tell you is whether the item description has
 changed over time.
 
-**When details change, you are notified.** You see both the current details and
+**When details change, you'll see it.** You see both the current details and
 the original details, along with a notice that the details have changed since
 you reserved the item.
 
@@ -294,7 +293,7 @@ reserving.
 
 ![Shared list with a warning on an item the owner changed after the page was opened](hxwish-shared-list-changed.png)
 
-**When a reserved item gets deleted, the owner gets a warning.** If you are
+**Deleting a reserved item takes an extra confirmation.** If you are
 really into gaslighting, it is still possible: we give the adults agency. If the
 owner tries to delete a reserved item, they will get a warning that it is
 already reserved, and the app will ask for an explicit confirmation to
@@ -315,8 +314,8 @@ instead of developing a granular access control system, I decided to simply
 access, and the owner sends the new one to the people they actually want to
 share the list with.
 
-Sounds neat, but this introduces a couple of edge cases that should be
-addressed. What if someone has already reserved something?
+Sounds neat, but it raises a couple of questions: what happens to existing
+reservations, and what do people with the old link see?
 
 **Reservations survive the link change.** Every reservation is kept, including
 those of people who no longer have access. They still see their reserved items
@@ -356,10 +355,9 @@ in the cluster. Switching to a Debian-based image fixed it.
 `docker-compose.yaml`: one service, SQLite on a volume, secrets in a `.env`
 file, migrations on start. `docker compose up -d` and that's it.
 
-**Helm.** My homelab runs k3s, so I also wanted a Helm chart. I used to rely on
-TrueCharts (see above), but the [bjw-s common library
-chart](https://github.com/bjw-s-labs/helm-charts) seems to be more widely
-adopted. For a simple app it removes the need to write your own manifests
+**Helm.** I used to rely on TrueCharts (see above), but the [bjw-s common
+library chart](https://github.com/bjw-s-labs/helm-charts) seems to be more
+widely adopted. For a simple app it removes the need to write your own manifests
 completely: the chart's only template is a single line,
 
 ```yaml
@@ -391,7 +389,7 @@ of boilerplate I didn't have to write or maintain.
 - Hosted: I also run it at [wishlist.lv](https://wishlist.lv). It's not a demo
   but a regular instance, so just log in with Google, Microsoft, GitHub or
   GitLab and create a list. It's free, and I run it for myself and friends, so
-  no guarantees. That said, if someone besides me starts using it, I will
+  no guarantees. That said, if other people start using it, I will
   probably keep paying for the domain. The data is not end-to-end encrypted, and
   technically I can read it, so if privacy matters to you, self-host it.
 
