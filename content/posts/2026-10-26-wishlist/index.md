@@ -6,7 +6,7 @@ ShowToc: true
 TocOpen: true
 ---
 
-## Why a wishlist?
+## Why a wishlist
 
 Wishlists make gift-giving easier. Givers don't have to guess, and recipients
 get something they actually want instead of another dust collector.
@@ -51,7 +51,7 @@ one specific use case.
 
 {{< collapse summary="Expand to see the detailed overview of the existing solutions" openByDefault=false >}}
 
-### [Wishlist](https://github.com/cmintey/wishlist) by cmintey
+**[Wishlist](https://github.com/cmintey/wishlist) by cmintey**
 
 672 stars. Wishlists for friends and family. Everyone has an account, and users
 are organised into groups where members see each other's lists and claim items.
@@ -78,7 +78,7 @@ Why it's not for me:
   are genuinely useful, just not to me, and since most can't be turned off,
   they only add clutter.
 
-### [Christmas Community](https://github.com/Wingysam/Christmas-Community)
+**[Christmas Community](https://github.com/Wingysam/Christmas-Community)**
 
 423 stars. A family Christmas wishlist that prevents double gifting. The admin
 creates an account for each family member, and everyone gets one list. Others
@@ -102,7 +102,7 @@ Why it's not for me:
 - Somehow too minimalistic and too bloated at the same time. Some buttons
   don't do anything, and overall it doesn't feel like a finished product.
 
-### [wishthis](https://github.com/wishthis/wishthis)
+**[wishthis](https://github.com/wishthis/wishthis)**
 
 310 stars. A privacy-focused wishlist platform with many translations. Users
 register and create lists, and anyone with the link can view a list and mark
@@ -121,7 +121,7 @@ Why it's not for me:
 Either one is a deal breaker, so I didn't look any further, even though it
 seems like a polished product.
 
-### [Pønskelisten](https://github.com/aunefyren/poenskelisten)
+**[Pønskelisten](https://github.com/aunefyren/poenskelisten)**
 
 214 stars. Group wishlists for a circle of registered users, such as a family.
 Owners share lists with groups, and group members claim gifts. Login is by
@@ -138,7 +138,7 @@ Why it's not for me:
 - On top of that, registration with invite codes is confusing (and buggy),
   although OIDC login should alleviate this.
 
-### [Wishlist](https://github.com/Reggio-Digital/wishlist) by Reggio-Digital
+**[Wishlist](https://github.com/Reggio-Digital/wishlist) by Reggio-Digital**
 
 47 stars. A single-container app for one household: one admin creates lists
 for everyone, shares them by URL, and friends claim items without an account.
@@ -152,7 +152,7 @@ Why it's not for me:
   family, where everyone can do and see everything.
 - Anyone can unclaim anyone's claim.
 
-### [simple-wishlist](https://github.com/ajb3932/simple-wishlist)
+**[simple-wishlist](https://github.com/ajb3932/simple-wishlist)**
 
 44 stars. One wishlist per instance for a birthday, Christmas or wedding. The
 owner adds items on an admin page, and visitors mark them as purchased.
@@ -165,7 +165,7 @@ Why it's not for me:
 - Anyone can mark an item as purchased, and anyone can undo it.
 - No commits in the last year.
 
-### [Wilik](https://github.com/joostvanopdorp/wilik)
+**[Wilik](https://github.com/joostvanopdorp/wilik)**
 
 37 stars. Personal wishlists shared by link. Guests claim items without an
 account, claims are hidden from the owner unless they opt in, and item details
@@ -211,15 +211,25 @@ lessons above literally.
 can create lists, and everything about a list is decided by its owner.
 
 **The owner decides what they see.** Some people love surprises, others don't.
-So each owner has a "view reserved" toggle on their list (off by default). When
-it's on, reserved items are marked. Yet, it never shows _who_ reserved an item.
+So each owner has a "View reserved" toggle on their list (off by default):
 
-**Only you can release your reservation.** Reserving and releasing is one click
-on the shared list. Nobody else can release your reservation, not even the
-owner.
+![Owner's list with reservations hidden](hxwish-owner-list.png)
+
+Flipping it reveals the reserved items. Yet, it never shows _who_ reserved
+an item.
+
+![Owner's list with "View reserved" on, two items marked as reserved](hxwish-owner-list-reserved.png)
 
 **Shared lists accept reservations.** Every list has a share link, and anyone
-who opens it can reserve items.
+who opens it can reserve items. Reserving and cancelling the reservation is just
+one click away.
+
+![Shared list view with Reserve buttons and one item reserved by the viewer](hxwish-shared-list.png)
+
+**Only you can release your reservation.** Nobody else can release your
+reservation, not even the owner.
+
+![Shared list as seen by another person, with an item marked "Reserved" and no button](hxwish-shared-list-other-reserved.png)
 
 **One login, but no new account.** This is the trade-off I settled on. Opening
 a shared list requires logging in with Google, Microsoft, GitHub or GitLab.
@@ -228,6 +238,8 @@ basically everyone already has, and it is what makes the previous points work:
 the app knows whose reservation is whose, so you can release yours and nobody
 else can. Sign in with Apple would be nice, but it costs money to set up.
 
+![Login page with Google, Microsoft, GitHub and GitLab buttons](hxwish-login.png)
+
 **No affiliate links, no holiday theme.** Links are stored exactly as you enter
 them, and nothing about the app assumes it's a specific holiday.
 
@@ -235,12 +247,14 @@ them, and nothing about the app assumes it's a specific holiday.
 lists, a "My reservations" page collects them all, so you don't have to dig up
 the links again when you go shopping.
 
-## The details that are not obvious
+![My reservations page with items grouped under two different lists](hxwish-my-reservations-multiple.png)
+
+### The details that are not obvious
 
 The basic flow is simple, but a few situations turned out to be trickier than
 they looked.
 
-### Stop (the app) gaslighting you
+#### Stop (the app) gaslighting you
 
 Mistakes happen, so there should be a way to fix them. The easiest fix would be
 to delete the item and add it again. But if the item was already reserved, this
@@ -258,10 +272,14 @@ changed over time.
 the original details, along with a notice that the details have changed since
 you reserved the item.
 
+![My reservations page, with a "changed by the owner" notice on one item](hxwish-my-reservations.png)
+
 A related race condition is also covered. If the owner changes the details
 _after_ you have loaded the page but before you reserve the item, the app warns
 you that the details have changed and asks you to review them again before
 reserving.
+
+![Shared list with a warning on an item the owner changed after the page was opened](hxwish-shared-list-changed.png)
 
 **When a reserved item gets deleted, the owner gets a warning.** If you are
 really into gaslighting, it is still possible: we give the adults agency. If the
@@ -269,7 +287,9 @@ owner tries to delete a reserved item, they will get a warning that it is
 already reserved, and the app will ask for an explicit confirmation to
 ~~gaslight~~ continue.
 
-### Uninvite (everyone all at once), but keep the gifts
+![Owner's list with a dialog warning that someone has already reserved the item, with "Keep it" and "Remove anyway" buttons](hxwish-delete-warning.png)
+
+#### Uninvite (everyone all at once), but keep the gifts
 
 A share link is easy to send and impossible to take back. But things happen:
 all of us have sent a message to the wrong chat, and some of us have fallen out
@@ -293,13 +313,12 @@ link they already had.
 
 **Retired links reveal nothing.** Opening an old link shows:
 
-> The link to this list has changed. Ask whoever shared it with you for the new
-  one.
+![Retired share link message: "The link to this list has changed. Ask whoever shared it with you for the new one."](hxwish-retired-link.png)
 
 The first version said "Ask <owner's name>", until I realised that it leaks the
 owner's name to exactly the people they might have wanted to cut off.
 
-## Tech
+### Under the hood
 
 **HTMX.** I hadn't heard of [HTMX](https://htmx.org) before this project, and
 it's the reason for the name: all its attributes start with `hx-`. The idea is
@@ -315,8 +334,6 @@ proper dialogs, and had to work around it. On top of that, Pico [stopped being
 maintained](https://picocss.com/docs/maintenance) recently. So I moved to
 [Beer CSS](https://www.beercss.com), which implements Material Design 3 and has
 the components I need. As a bonus, it passes my own "not Web 2.0" check well.
-
-## Deployment
 
 **Docker.** The app ships as a Docker image. A small remark for anyone building
 Python images for Kubernetes: I started with Alpine, but OIDC login didn't work
@@ -339,33 +356,6 @@ completely: the chart's only template is a single line,
 and everything else (Deployment, init container for migrations, Service,
 Ingress, PVC, probes) is about a hundred lines of `values.yaml`. That's a lot
 of boilerplate I didn't have to write or maintain.
-
-## What it looks like
-
-Here is a quick tour of hx-wish.
-
-Login is OAuth only, so there is nothing to register:
-
-![Login page with Google, Microsoft, GitHub and GitLab buttons](hxwish-login.png)
-
-The owner's list. Items can have a link and a note, and can be reordered by
-dragging. Reservations are hidden from the owner by default:
-
-![Owner's list with reservations hidden](hxwish-owner-list.png)
-
-The owner can opt in to see which items are reserved, but not by whom:
-
-![Owner's list with "View reserved" on, two items marked as reserved](hxwish-owner-list-reserved.png)
-
-The "My reservations" page lists everything I have reserved across all lists.
-If the owner edits an item after I reserved it, I see what I originally
-reserved next to the new version:
-
-![My reservations page, with a "changed by the owner" notice on one item](hxwish-my-reservations.png)
-
-When the owner regenerates a share link, the old one stops working and says so:
-
-![Retired share link message](hxwish-retired-link.png)
 
 ## Try it
 
