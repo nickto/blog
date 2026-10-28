@@ -9,8 +9,7 @@ TocOpen: true
 ## Why a wishlist?
 
 Wishlists make gift-giving easier. Givers don't have to guess, and recipients
-get something they actually want instead of another dust collector. Less
-guessing means less dust collecting shelfware.
+get something they actually want instead of another dust collector.
 
 But what about surprises? If the list is long enough, you don't know exactly
 what you'll get or from whom, so there is still plenty of room for surprise.
@@ -44,9 +43,11 @@ I have a homelab running k3s. And a bunch of services there use Helm charts by
 [TrueCharts](https://truecharts.org/), so naturally, it was the first place I
 checked. But there was no single wishlist app.
 
-So I turned to Google: the first time I looked into this was a few years ago,
-so one would still use a search engine instead of an LLM. While doing that,
-I discovered that wishlists are probably the most popular type of apps after calculators and weather apps. Yet, a couple of them genuinly look like generic and polished solutions. While the rest is mostly targeting a very specific use case.
+So I turned to Google. The first time I looked was a few years ago, back when
+people still searched instead of asking an LLM. Wishlists seem to be one of the
+most popular hobby projects, right after calculators and weather apps. Yet only
+a couple of them look like genuinely polished, general-purpose apps: most target
+one specific use case.
 
 {{< collapse summary="Expand to see the detailed overview of the existing solutions" openByDefault=false >}}
 
@@ -84,7 +85,7 @@ creates an account for each family member, and everyone gets one list. Others
 in the family pledge items and can see what has been pledged, but the owner
 can't. It also supports guest viewing, OIDC login and a single-list mode.
 
-It is surprisingly popular given what I found, so it's quite possible I'm
+It is surprisingly popular given how rough it felt, so it's quite possible I'm
 missing something.
 
 What I liked: pledging and unpledging are one click, an item can't be pledged
@@ -126,15 +127,15 @@ seems like a polished product.
 Owners share lists with groups, and group members claim gifts. Login is by
 password or OIDC.
 
-What I liked: reserve and release are done right. There's one claim per item,
+What I liked: claiming and releasing are done right. There's one claim per item,
 the claimer can release it, and the owner never sees claims. It's also actively
 maintained, with OIDC, two-factor authentication and session management.
 
 Why it's not for me:
 
-- Items on public lists can't be claimed.
-- So one needs not only to register, but also to be added to a group.
-- On top of that registration with invite codes is confusing (and buggy),
+- Items on public lists can't be claimed, so givers need to register _and_ be
+  added to a group.
+- On top of that, registration with invite codes is confusing (and buggy),
   although OIDC login should alleviate this.
 
 ### [Wishlist](https://github.com/Reggio-Digital/wishlist) by Reggio-Digital
@@ -189,8 +190,8 @@ Why it's not for me:
 
 Going through these apps added a few things to my list:
 
-- **No admin,** please. Owners should manage their own lists and settings. Nobody should have
-  to create accounts or flip global switches for them.
+- **No admin,** please. Owners should manage their own lists and settings.
+  Nobody should have to create accounts or flip global switches for them.
 - **No holiday theme.** Wishlists are for birthdays and weddings too, not just
   Christmas.
 - **No Web 2.0 look.**
@@ -202,29 +203,30 @@ Going through these apps added a few things to my list:
 
 ## Building my own
 
-So I built [hx-wish](https://gitlab.com/nickto/hx-wish). The idea is to keep it simple and
-minimalistic, both in the UI and in the backend, and to take the lessons above
-literally.
+So I built [hx-wish](https://gitlab.com/nickto/hx-wish). The idea is to keep it
+simple and minimalistic, both in the UI and in the backend, and to take the
+lessons above literally.
 
 **No admin.** There is no admin role and no global switches. Anyone who logs in
 can create lists, and everything about a list is decided by its owner.
 
-**The owner decides what they see.** Some people love surprises, others---don't. So each owner has a "view reserved" toggle on their list (off by
-default). When it's on, reserved items are marked. Yet, it never shows _who_ reserved
-an item.
+**The owner decides what they see.** Some people love surprises, others don't.
+So each owner has a "view reserved" toggle on their list (off by default). When
+it's on, reserved items are marked. Yet, it never shows _who_ reserved an item.
 
 **Only you can release your reservation.** Reserving and releasing is one click
-on the shared list.
+on the shared list. Nobody else can release your reservation, not even the
+owner.
 
-**Shared lists are claimable.** Every list has a share link, and anyone who
-opens it can reserve items.
+**Shared lists accept reservations.** Every list has a share link, and anyone
+who opens it can reserve items.
 
 **One login, but no new account.** This is the trade-off I settled on. Opening
 a shared list requires logging in with Google, Microsoft, GitHub or GitLab.
 That is one extra step compared to an anonymous link, but it's an account
 basically everyone already has, and it is what makes the previous points work:
 the app knows whose reservation is whose, so you can release yours and nobody
-else can. Would be nice to add Apple accounts, but it costs moeney.
+else can. Sign in with Apple would be nice, but it costs money to set up.
 
 **No affiliate links, no holiday theme.** Links are stored exactly as you enter
 them, and nothing about the app assumes it's a specific holiday.
@@ -240,32 +242,32 @@ they looked.
 
 ### Stop (the app) gaslighting you
 
-Mistakes happen. So there should be a way to fix them. The easiest one, would
-be to delete the item and add it again. But if the item was already reserved, it
-introduces the breeding ground for overlaps and confusion. And the whole idea of
-reserving an item is to prevent this. Thus, the app needs to be able to
-handle edits to items that have already been reserved. 
+Mistakes happen, so there should be a way to fix them. The easiest fix would be
+to delete the item and add it again. But if the item was already reserved, this
+creates a breeding ground for overlaps and confusion, and the whole idea of
+reserving an item is to prevent exactly that. Thus, the app needs to handle
+edits to items that have already been reserved.
 
-This, in its turn, is a recipe for gaslighting. Say, you reserved a "blue
-sweater, size M", and later the owner edits it to "red sweater, size L". Are you
-sure it used to say "blue"? Do you have memory issues? Are you going insane?
-Maybe, I am not a doctor. But what I can tell you is whether the item
-description has changed over time. 
+This, in turn, is a recipe for gaslighting. Say you reserved a "blue sweater,
+size M", and later the owner edits it to "red sweater, size L". Are you sure it
+used to say "blue"? Do you have memory issues? Are you going insane? Maybe. I'm
+not a doctor. But what I can tell you is whether the item description has
+changed over time.
 
-**When details change, you are notified.** You see both: the current details and
-the original details, along with a notice that the details have changed
-since you reserved the item. 
+**When details change, you are notified.** You see both the current details and
+the original details, along with a notice that the details have changed since
+you reserved the item.
 
-A related edge case race condition is also covered. If the owner changes the
-details _after_ you have already loaded the page, but haven't reserved an item
-yet, the app warns you that the details have changed and asks to review them
-again before reserving.
+A related race condition is also covered. If the owner changes the details
+_after_ you have loaded the page but before you reserve the item, the app warns
+you that the details have changed and asks you to review them again before
+reserving.
 
-**When a reserved item gets deleted, the owner gets a warning.** Still, if you are
-really into gaslighting, it is still possible. If the owner tries to delete an item
-that is already reserved, they will get a warning that someone has reserved it, and 
-will ask for explicit confirmation to ~gaslight~ continue: we leave adults agency.
-
+**When a reserved item gets deleted, the owner gets a warning.** If you are
+really into gaslighting, it is still possible: we give the adults agency. If the
+owner tries to delete a reserved item, they will get a warning that it is
+already reserved, and the app will ask for an explicit confirmation to
+~~gaslight~~ continue.
 
 ### Uninvite (everyone all at once), but keep the gifts
 
@@ -289,10 +291,10 @@ on the "My reservations" page, and can even release their reservations from
 there. What they don't get is the new link: the page only ever points to the
 link they already had.
 
-**Retired links reveal nothing.** Opening an old link shows
+**Retired links reveal nothing.** Opening an old link shows:
 
 > The link to this list has changed. Ask whoever shared it with you for the new
-  one
+  one.
 
 The first version said "Ask <owner's name>", until I realised that it leaks the
 owner's name to exactly the people they might have wanted to cut off.
@@ -309,7 +311,7 @@ templates and SQLite.
 **From Pico.css to Beer CSS.** I started with [Pico.css](https://picocss.com),
 which styles plain semantic HTML with almost no classes. It got me surprisingly
 far, but I kept running into things it didn't have, like menus, snackbars and
-proper dialogs, and had to workaround it. On top of that, Pico [stopped being
+proper dialogs, and had to work around it. On top of that, Pico [stopped being
 maintained](https://picocss.com/docs/maintenance) recently. So I moved to
 [Beer CSS](https://www.beercss.com), which implements Material Design 3 and has
 the components I need. As a bonus, it passes my own "not Web 2.0" check well.
@@ -317,10 +319,8 @@ the components I need. As a bonus, it passes my own "not Web 2.0" check well.
 ## Deployment
 
 **Docker.** The app ships as a Docker image. A small remark for anyone building
-Python images for Kubernetes: I started with Alpine, and login broke in the
-cluster because the pod couldn't resolve Google's OAuth host. musl's resolver
-gives up on lookups that glibc retries, which matters with Kubernetes'
-`ndots:5`. Switching to a Debian-based image fixed it.
+Python images for Kubernetes: I started with Alpine, but OIDC login didn't work
+in the cluster. Switching to a Debian-based image fixed it.
 
 **Docker Compose.** For the "just try it" route there is a
 `docker-compose.yaml`: one service, SQLite on a volume, secrets in a `.env`
@@ -382,6 +382,9 @@ When the owner regenerates a share link, the old one stops working and says so:
   helm pull oci://rg.pl-waw.scw.cloud/nicktocharts/hx-wish --version 1.1.0
   ```
 
+  (Version 1.1.0 is the latest as of 2026-10-28; check the registry for newer
+  ones.)
+
 - Hosted: I also run it at [wishlist.lv](https://wishlist.lv). It's not a demo
   but a regular instance, so just log in with Google, Microsoft, GitHub or
   GitLab and create a list. It's free, and I run it for myself and friends, so
@@ -391,6 +394,5 @@ When the owner regenerates a share link, the old one stops working and says so:
 
 ## Closing thoughts
 
-It's a simple app, and I kept it that way on purpose: making it look good on
-every screen size adds complexity, so some things look rough on mobile. Still, I
-hope it saves at least one dust collector, or one awkward moment.
+It's a simple app, and I kept it that way on purpose. I hope it spares someone
+at least one dust collector, or one awkward moment.
