@@ -1,5 +1,5 @@
 ---
-title: "Wishlist"
+title: "Building the wishlist app I couldn't find"
 date: 2026-10-25T21:38:53+02:00
 draft: true
 ShowToc: true
