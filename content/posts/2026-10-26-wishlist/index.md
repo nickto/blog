@@ -185,7 +185,7 @@ Why it's not for me:
 
 Going through these apps added a few things to my list:
 
-- **No admin.** Owners manage their own lists and settings. Nobody should have
+- **No admin,** please. Owners should manage their own lists and settings. Nobody should have
   to create accounts or flip global switches for them.
 - **No holiday theme.** Wishlists are for birthdays and weddings too, not just
   Christmas.
@@ -198,6 +198,98 @@ Going through these apps added a few things to my list:
 
 ## Building my own
 
-- Simple and minimalistic in GUI and backend.
-- The owner of the lists decides whether they want to see what is already
-  reserved: some people don't like surprises and it's up to them to decide.
+So I built [hx-wish](https://gitlab.com/nickto/hx-wish). The idea is to keep it simple and
+minimalistic, both in the UI and in the backend, and to take the lessons above
+literally.
+
+**No admin.** There is no admin role and no global switches. Anyone who logs in
+can create lists, and everything about a list is decided by its owner.
+
+**The owner decides what they see.** Some people love surprises, others---don't. So each owner has a "view reserved" toggle on their list (off by
+default). When it's on, reserved items are marked. Yet, it never shows _who_ reserved
+an item.
+
+**Only you can release your reservation.** Reserving and releasing is one click
+on the shared list.
+
+**Shared lists are claimable.** Every list has a share link, and anyone who
+opens it can reserve items.
+
+**One login, but no new account.** This is the trade-off I settled on. Opening
+a shared list requires logging in with Google, Microsoft, GitHub or GitLab.
+That is one extra step compared to an anonymous link, but it's an account
+basically everyone already has, and it is what makes the previous points work:
+the app knows whose reservation is whose, so you can release yours and nobody
+else can. Would be nice to add Apple accounts, but it costs moeney.
+
+**No affiliate links, no holiday theme.** Links are stored exactly as you enter
+them, and nothing about the app assumes it's a specific holiday.
+
+**One place for all your reservations.** If you have reserved items on multiple
+lists, a "My reservations" page collects them all, so you don't have to dig up
+the links again when you go shopping.
+
+## The details that are not obvious
+
+The basic flow is simple, but a few situations turned out to be trickier than
+they looked.
+
+### Stop (the app) gaslighting you
+
+Mistakes happen. So there should be a way to fix them. The easiest one, would
+be to delete the item and add it again. But if the item was already reserved, it
+introduces the breeding ground for overlaps and confusion. And the whole idea of
+reserving an item is to prevent this. Thus, the app needs to be able to
+handle edits to items that have already been reserved. 
+
+This, in its turn, is a recipe for gaslighting. Say, you reserved a "blue
+sweater, size M", and later the owner edits it to "red sweater, size L". Are you
+sure it used to say "blue"? Do you have memory issues? Are you going insane?
+Maybe, I am not a doctor. But what I can tell you is whether the item
+description has changed over time. 
+
+**When details change, you are notified.** You see both: the current details and
+the original details, along with a notice that the details have changed
+since you reserved the item. 
+
+A related edge case race condition is also covered. If the owner changes the
+details _after_ you have already loaded the page, but haven't reserved an item
+yet, the app warns you that the details have changed and asks to review them
+again before reserving.
+
+**When a reserved item gets deleted, the owner gets a warning.** Still, if you are
+really into gaslighting, it is still possible. If the owner tries to delete an item
+that is already reserved, they will get a warning that someone has reserved it, and 
+will ask for explicit confirmation to ~gaslight~ continue: we leave adults agency.
+
+
+### Uninvite (everyone all at once), but keep the gifts
+
+A share link is easy to send and impossible to take back. But things happen:
+all of us have sent a message to the wrong chat, and some of us have fallen out
+with someone after sharing our most intimate wishes. So there should be a way
+to take back control.
+
+To stay in line with the self-imposed requirement to keep the app simple,
+instead of developing a granular access control system, I decided to simply
+**let the owner regenerate the share link.** Everyone with the old link loses
+access, and the owner sends the new one to the people they actually want to
+share the list with.
+
+Sounds neat, but this introduces a couple of edge cases that should be
+addressed. What if someone has already reserved something?
+
+**Reservations survive the link change.** Every reservation is kept, including
+those of people who no longer have access. They still see their reserved items
+on the "My reservations" page, and can even release their reservations from
+there. What they don't get is the new link: the page only ever points to the
+link they already had.
+
+**Retired links reveal nothing.** Opening an old link shows
+
+> The link to this list has changed. Ask whoever shared it with you for the new
+  one
+
+The first version said "Ask <owner's name>", until I realised that it leaks the
+owner's name to exactly the people they might have wanted to cut off.
+
