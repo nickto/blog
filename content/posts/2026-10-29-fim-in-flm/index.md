@@ -13,25 +13,25 @@ trickier than I expected, not to mention running it on an NPU.
 ## Fill-in-the-middle
 
 We are mostly used to chat models that generate text left-to-right: the next
-token is generated using the context that precedes it. The inline suggestions
-are slightly different: both the context before and after the cursor matters.
+token is generated using the context that precedes it. Inline suggestions
+are slightly different: both the context before and after the cursor matter.
 E.g., for a docstring we need to know both the function name with arguments and
 the function code.
 
-Models used for this type of task are trained using the _fill-in-the-middle_
+Models used for this type of task are trained with the _fill-in-the-middle_
 (FIM) objective[^1]. This is not a different model architecture, but rather a
 different training objective. Technically, most LLMs should be able to do the
 task if we describe what we expect from them in the prompt. But this is very
-chatty, less efficient and more likely to cause the output format we do not
+chatty, less efficient, and more likely to produce an output format we do not
 expect.
 
-However, making the model capable of doing FIM tasks, requires a change in the
+However, making a model capable of doing FIM tasks requires a change in the
 training pipeline, and not all models were trained with this change. So we need
-to narrow down the list models to the ones that were.
+to narrow down the list of models to the ones that were.
 
-Given the aspects which I will discuss in the NPU section, just mentioning that
-[Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is one of these
-models
+Given the aspects which I will discuss in the NPU section, I will just mention
+that [Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is one of
+these models.
 
 
 
