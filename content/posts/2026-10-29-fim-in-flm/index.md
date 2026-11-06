@@ -187,11 +187,25 @@ commercial, but you cannot read or change them. And these kernels are the part
 that actually runs on the NPU, so if the model is not on the list, there is not 
 much you can do. At least without jumping through a lot of hoops.
 
+Unfortunately, even though FLM offers quite a few models, none of them are the
+FIM capable. So we cannot use an off-the-shelve solution here.
+
 ## Converting the model
 
-### From GGUF to NPU2
+One way of jumping through the hoops is to reuse the kernels of a model that is
+already supported, and only replace the weights. However, this is possible only
+if the models share the exact same architecture. This is the approach used in
+[this project](https://github.com/ROCm/FLM_Q4NX_Converter).
 
-- The semi-official conversion scripts: what they do
+And we are in luck here again, because the commonly recommended models for
+inline completions are the smaller versions of Qwen2.5-Coder. Since
+[Qwen2.5-3B-Instruct](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct)
+is officially supported and has the same architecture as Qwen2.5-Coder-3B, we
+can reuse its kernels and convert the Coder weights to Q4NX, the format FLM's
+models use.
+
+### From GGUF to Q4NX
+
 - Why they did not work for Qwen
 - The matrix reordering
 
