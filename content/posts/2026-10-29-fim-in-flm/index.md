@@ -4,16 +4,6 @@ date: 2026-10-29T12:30:49+02:00
 draft: true
 ---
 
-# TODO
-
-- [x] FIM-capable
-- [x] Vulkan vs ROCm
-- [ ] FLM: making in technically possible
-- [ ] FLM and AWQ: bringing performance closer to GGUF
-- [ ] SAFIM comparing FLM and GGUF.
-- [ ] Taskfile: sources, generates, label.
-
-
 My GitHub Copilot subscription, paid for by a previous employer, has recently
 ended. So before paying for it out of my own pocket, I decided to check whether
 I can run a local model for inline suggestions: these do not require powerful
@@ -128,9 +118,49 @@ hand warmer, which is nice. But it drains the battery, which is not nice. And
 because NPUs are supposed to be much more energy efficient than GPUs, running
 models for such background tasks on NPU sounds very appealing.
 
-### How to run? 
+### FLM
 
-There is a great project ... (TODO)
+- What FLM is and why it is the easiest way onto this NPU
+- What you get out of the box: the model list and how to serve one
+- `/completion` vs `/chat/completions`, and why FIM needs the raw prompt
+
+### The catch: no coder model
+
+- The model choice is limited, and none of the models is a coder model
+- `/completion` support alone is not enough: the model must be trained for FIM
+- Why I picked Qwen2.5-Coder-3B (pays off the promise in the FIM section)
+
+## Converting the model
+
+### From GGUF to NPU2
+
+- The semi-official conversion scripts: what they do
+- Why they did not work for Qwen
+- The matrix reordering
+
+### It runs, but the output is bad
+
+- A real example of a bad completion
+- What I think causes it
+
+### Improving the quality
+
+- What I tried, briefly, and why each attempt fell short
+- Why I settled on AWQ
+
+## Evaluation
+
+- What SAFIM is and why I used it
+- Quality: processing variants vs GGUF alternatives (benchmark in progress)
+- Speed: NPU vs GPU latency
+- Maybe: official Instruct model vs this pipeline
+- Maybe: power draw, NPU vs GPU
+
+## Verdict
+
+- Surprisingly good quality
+- A bit slow: latency on the GPU is better
+- The answer to the opening question: is it worth using instead of Copilot?
 
 ## References and links
 
