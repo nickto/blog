@@ -123,10 +123,10 @@ the choice of the models that can run on it is very limited.
 If running models on NPU is hard, why use it at all? Well, the inline
 suggestions are a background task: they fire constantly while you type. So
 running them on a GPU is hard to miss: its load sits close to 100% almost all of
-the time. It small iGPU cannot heat your whole house, but can work as a good
+the time. Its small iGPU cannot heat your whole house, but can work as a good
 hand warmer, which is nice. But it drains the battery, which is not nice. And
 because NPUs are supposed to be much more energy efficient than GPUs, running
-models for such backgorund tasks on NPU sounds very appealing.
+models for such background tasks on NPU sounds very appealing.
 
 ### How to run? 
 
