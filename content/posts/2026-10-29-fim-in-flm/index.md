@@ -6,8 +6,8 @@ draft: true
 
 # TODO
 
-- [ ] FIM-capable
-- [ ] Vulkan vs ROCm
+- [x] FIM-capable
+- [x] Vulkan vs ROCm
 - [ ] FLM: making in technically possible
 - [ ] FLM and AWQ: bringing performance closer to GGUF
 - [ ] SAFIM comparing FLM and GGUF.
@@ -35,8 +35,8 @@ part, the model should fill in the missing part.
 
 Technically, most LLMs should be able to do the task if we describe what we
 expect from them in the prompt. But this is very chatty, less efficient, and
-more likely to produce an output format we do not expect. For this reason, the
-inline suggestion tool format their requests to LLMs in a special FIM format.
+more likely to produce an output format we do not expect. For this reason,
+inline suggestion tools format their requests to LLMs in a special FIM format.
 However, not all models understand it because in order to do so, the model
 should have been trained on this format. So we need to narrow down the list of
 models to the ones that were.
@@ -49,7 +49,7 @@ these models.
 
 Running on GPU, regardless of whether it is discrete or integrated, is
 straightforward: just find a suitable model and serve with
-[llama.cpp](https://github.com/ggml-org/llama.cpp) using the backed that your
+[llama.cpp](https://github.com/ggml-org/llama.cpp) using the backend that your
 GPU supports.
 
 ### Vulkan vs ROCm
@@ -68,7 +68,7 @@ for it.
 
 Vulkan only needs the regular graphics driver, so it is much easier to set up,
 and because it is cross-vendor, it has larger adoption and is more stable. ROCm
-is vendor-tuned and targets the hardware directly, so it one can expect that
+is vendor-tuned and targets the hardware directly, so one can expect that
 matrix-multiplication should be faster on ROCm. On the flip side, support for
 integrated GPUs is often unofficial, and therefore the whole setup can be less
 stable and require some fiddling to make it work. For example, the 890M needs
@@ -77,7 +77,7 @@ stable and require some fiddling to make it work. For example, the 890M needs
 has no kernels.
 
 Luckily, llama.cpp has a built-in utility for measuring model throughput, which
-I used it to benchmark performance:
+I used to benchmark performance:
 
 - across the two backends,
 - for two quantization levels,
@@ -87,9 +87,9 @@ I used it to benchmark performance:
 
 ![Token generation throughput.](bench_generation.svg)
 
-The main takeway here is that for inline completions, which typically have long
+The main takeaway here is that for inline completions, which typically have long
 prompts and short completions, it's prompt processing that is the bottleneck,
-and ROCm is noticably faster for the F16 variant, while Vulkan is faster for Q4_0.
+and ROCm is noticeably faster for the F16 variant, while Vulkan is faster for Q4_0.
 
 Treat these conclusions with a grain of salt, though. I noticed that the same
 parameters can yield wildly different results within the different retries of
@@ -101,6 +101,36 @@ stable because they are equally affected.
 
 ## NPU
 
+Another option is to run on an NPU, e.g., I have an AMD Ryzen AI 9 HX 370, which
+has one built in. An NPU (neural processing unit) is an accelerator that is
+basically built for efficient matrix multiplication. And neural networks mostly
+consist of matrix multiplications, so it is very suitable for running them.
+Unlike a GPU, its goal is energy efficiency rather than peak speed.
+
+### NPU vs GPU
+
+A GPU is very flexible: it decides how to schedule the work while it is running,
+so it can handle almost any parallel computation. An NPU saves power by having
+this decided in advance, when the model is compiled for it. The result is
+efficient, but only for the exact computation it was prepared for.
+
+The practical consequence of that is that you cannot just run any model on it,
+like on a GPU. Each model has to be specifically prepared for the hardware so
+the choice of the models that can run on it is very limited.
+
+### Why bother?
+
+If running models on NPU is hard, why use it at all? Well, the inline
+suggestions are a background task: they fire constantly while you type. So
+running them on a GPU is hard to miss: its load sits close to 100% almost all of
+the time. It small iGPU cannot heat your whole house, but can work as a good
+hand warmer, which is nice. But it drains the battery, which is not nice. And
+because NPUs are supposed to be much more energy efficient than GPUs, running
+models for such backgorund tasks on NPU sounds very appealing.
+
+### How to run? 
+
+There is a great project ... (TODO)
 
 ## References and links
 
