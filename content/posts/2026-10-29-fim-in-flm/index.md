@@ -18,10 +18,11 @@ are slightly different: both the context before and after the cursor matter.
 E.g., for a docstring we need to know both the function name with arguments and
 the function code.
 
-Models used for this type of task are trained with the _fill-in-the-middle_
-(FIM) objective[^1]. This is not a different model architecture, but rather a
-different training objective, where given the text before and after the missing
-part, the model should fill in the missing part. 
+Models used for this type of task are commonly trained with the
+_fill-in-the-middle_ (FIM) objective, proposed by [Bavarian, M., et al. in
+2022](https://arxiv.org/abs/2207.14255). This is not a different model
+architecture, but rather a different training objective, where given the text
+before and after the missing part, the model should fill in the missing part. 
 
 Technically, most LLMs should be able to do the task if we describe what we
 expect from them in the prompt. But this is very chatty, less efficient, and
@@ -118,17 +119,73 @@ hand warmer, which is nice. But it drains the battery, which is not nice. And
 because NPUs are supposed to be much more energy efficient than GPUs, running
 models for such background tasks on NPU sounds very appealing.
 
-### FLM
+### FastFlowLM
 
-- What FLM is and why it is the easiest way onto this NPU
-- What you get out of the box: the model list and how to serve one
-- `/completion` vs `/chat/completions`, and why FIM needs the raw prompt
+Luckily, there is a great project, called [FastFlowLM](https://fastflowlm.com/)
+(FLM). It is a runtime for the Ryzen AI NPU. You install it, run something like
+`flm serve llama3.2:1b`, and get a local server with an OpenAI-compatible API
+that any tool can talk to.
 
-### The catch: no coder model
+FLM [started in 2025](https://github.com/ROCm/FastFlowLM/blob/main/flm_story.md)
+as a university research project and quickly became a small startup. In July
+2026, [it officially joined
+AMD](https://www.amd.com/en/blogs/2026/fastflowlm-joins-amd-to-advance-ai-inference.html),
+and the code now lives in [AMD's ROCm
+organization](https://github.com/ROCm/FastFlowLM).
 
-- The model choice is limited, and none of the models is a coder model
-- `/completion` support alone is not enough: the model must be trained for FIM
-- Why I picked Qwen2.5-Coder-3B (pays off the promise in the FIM section)
+#### The good
+
+FLM offers a pretty [wide choice of smaller
+LLMs](https://fastflowlm.com/docs/models/) (and a couple of other neural
+networks). 
+
+Among many, they ship:
+
+- [Qwen3.6-35B-A3B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen36-35b-a3b),
+  which is powerful, yet fast, because only a small part of it is used for each
+  individual token generation (the "A3B" in the name).
+-
+  [Qwen2.5-3B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct),
+  which is a bit boring in itself, and because it is an Instruct rather than a
+  Coder variant, it cannot do FIM. But it is crucial that this model is
+  available, because it comes from a family of models that _does_ have a Coder
+  variant. And we will use it to run inline suggestions.
+
+The list is constantly being updated, so it's worth keeping an eye on. E.g., last
+time I checked,
+[Qwen3.8-27B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen38-27b)
+was not there, yet, but is there now.
+
+Moreover, besides the usual `/v1/chat/completions` endpoint, which is used for
+chats, FLM also supports the [legacy
+`/v1/completions`](https://github.com/ROCm/FastFlowLM/releases/tag/v0.9.13) one,
+and this is another crucial piece that makes inline suggestions possible.
+
+The difference between the two endpoints is what happens to your text. The chat
+endpoint takes a list of messages, and the server wraps them in the model's chat
+template before the model sees them. The completions endpoint takes a raw
+prompt, passes it to the model as is, and the model simply continues it.
+
+FIM needs the latter, because a FIM request is not a conversation. It is a
+single string that contains the context before and after where we want the
+suggestion.
+
+This may sound like a minor detail, but many serverless model providers offer
+only the chat endpoint, so you cannot use them for inline completions, even if
+the model itself was trained for FIM. Technically, one could find a workaround
+maybe, but the existing tools expect the `/v1/completions` endpoint (or an even
+less commonly supported `/v1/fim/completions`).
+
+#### The bad
+
+But there is one important caveat: FLM is only partly open source. The
+orchestration code and the CLI are
+[MIT-licensed](https://github.com/ROCm/FastFlowLM/blob/main/LICENSE_RUNTIME.txt),
+but **the NPU kernels are closed binaries**. They are [free for any
+use](https://github.com/ROCm/FastFlowLM/blob/main/LICENSE_BINARY.txt), including
+commercial, but you cannot read or change them. And these kernels are the part
+that actually runs on the NPU, so if the model is not on the list, there is not 
+much you can do. At least without jumping through a lot of hoops.
 
 ## Converting the model
 
