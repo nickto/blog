@@ -57,9 +57,47 @@ GPU supports.
 I have an integrated Radeon 890M, which supports both Vulkan and ROCm on Linux, 
 so I have to pick.
 
-ROCm is the AMD's implementation of the OpenCL standard. Vulkan is a low-level
-graphics API. 
+**Vulkan** is a cross-vendor, low-level graphics API that also supports compute
+shaders. llama.cpp's Vulkan backend expresses the same operations as generic
+shaders, which the driver then compiles for whatever GPU is there.
 
+**ROCm** is AMD's GPU compute platform, an answer to NVIDIA's CUDA. Its main
+programming model is HIP, which looks like CUDA and compiles to code written
+specifically for AMD GPU architectures. llama.cpp has a dedicated HIP backend
+for it.
+
+Vulkan only needs the regular graphics driver, so it is much easier to set up,
+and because it is cross-vendor, it has larger adoption and is more stable. ROCm
+is vendor-tuned and targets the hardware directly, so it one can expect that
+matrix-multiplication should be faster on ROCm. On the flip side, support for
+integrated GPUs is often unofficial, and therefore the whole setup can be less
+stable and require some fiddling to make it work. For example, the 890M needs
+`HSA_OVERRIDE_GFX_VERSION=11.0.0` to make ROCm treat it as an RDNA 3 GPU
+(gfx1100) instead of its actual RDNA 3.5 architecture (gfx1150), for which ROCm
+has no kernels.
+
+Luckily, llama.cpp has a built-in utility for measuring model throughput, which
+I used it to benchmark performance:
+
+- across the two backends,
+- for two quantization levels,
+- across input and output sizes realistic for FIM tasks.
+
+![Prompt processing throughput.](bench_prompt.svg)
+
+![Token generation throughput.](bench_generation.svg)
+
+The main takeway here is that for inline completions, which typically have long
+prompts and short completions, it's prompt processing that is the bottleneck,
+and ROCm is noticably faster for the F16 variant, while Vulkan is faster for Q4_0.
+
+Treat these conclusions with a grain of salt, though. I noticed that the same
+parameters can yield wildly different results within the different retries of
+the same experiment run. The likely culprit is thermal throttling: giving the
+GPU time to cool down between runs seemed to help, and the results become much
+more stable. However, I have not tested this hypothesis directly, so I cannot
+guarantee that the results shown here are not affected by it, rather than being
+stable because they are equally affected.
 
 ## NPU
 
