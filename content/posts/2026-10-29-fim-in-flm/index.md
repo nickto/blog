@@ -90,6 +90,85 @@ more stable. However, I have not tested this hypothesis directly, so I cannot
 guarantee that the results shown here are not affected by it, rather than being
 stable because they are equally affected.
 
+### Example query and completion
+
+As a quick test of whether it works, I check how models complete the following code:
+
+```python
+def add(a, b):
+    # Complete here
+    return c
+```
+
+In the case of Qwen 2 models, this request should be formatted as the following prompt:
+
+```json
+"<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+```
+
+where we first supply the prefix, or the part goes before the completion, then
+the suffix, or the part that goes after the completion, and ask the model to
+fill in the middle, or the actual completion. So the full request looks like 
+this
+
+```json
+{
+  "model": "<model name>",
+  "max_tokens": 32,
+  "temperature": 0,
+  "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+}
+```
+
+and full `curl` command for the F16 Qwen 2.5 Coder 3B model, looks like this
+(assuming that llama.cpp is running on `localhost:8080`):
+
+```bash
+curl http://localhost:8080/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+          "model": "qwen2.5-coder-3b-f16",
+          "max_tokens": 64,
+          "temperature": 0,
+          "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+        }' \
+    | jq '.choices[0]'
+```
+
+The result is:
+
+```json
+{
+  "text": "c = a + b\n    return c\n\ndef sub(a, b):\n    c = a - b\n    return c\n\ndef mul(a, b):\n    c = a * b\n    return c\n\ndef div(a, b):\n    c = a / b",
+  "index": 0,
+  "logprobs": null,
+  "finish_reason": "stop"
+}
+```
+
+which implies that the code after the suggested completion is:
+
+```python
+def add(a, b):
+    c = a + b
+    return c
+
+def sub(a, b):
+    c = a - b
+    return c
+
+def mul(a, b):
+    c = a * b
+    return c
+
+def div(a, b):
+    c = a / b
+    return c    
+```
+
+We can discuss whether this exactly what we wanted or not, but at least it is
+hard to argue that this is a totally valid completion.
+
 ## NPU
 
 Another option is to run on an NPU, e.g., I have an AMD Ryzen AI 9 HX 370, which
@@ -204,10 +283,50 @@ is officially supported and has the same architecture as Qwen2.5-Coder-3B, we
 can reuse its kernels and convert the Coder weights to Q4NX, the format FLM's
 models use.
 
-### From GGUF to Q4NX
+### The journey from GGUF to Q4NX
 
-- Why they did not work for Qwen
-- The matrix reordering
+#### The naive approach
+
+[FLM Q4NX Converter](https://github.com/ROCm/FLM_Q4NX_Converter) expects a Q4_0
+or Q4_1 quantized weights in GGUF format. And the [model's
+card](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct)
+says that is uses the Q4_1 quantization, so we go to
+[Huggingace](https://huggingface.co/Qwen/Qwen2.5-Coder-3B), download the
+waights, convert them to GGUF, quantize to Q4_1, and convert to Q4NX.
+
+Sounds easy, does not work. The model produces garbage.
+
+Let's look at out smoke test query.
+
+```bash
+curl http://localhost:52625/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+          "model": "qwen2.5-coder:3b-q4_1-no-eos-fix",
+          "max_tokens": 64,
+          "temperature": 0,
+          "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+        }' \
+    | jq '.choices[0]'
+```
+
+which returns
+
+```json
+{
+  "text": "EFR<|fim_middle|>[\".té ЮрuratneauEFR<|fim_middle|>getherasil˟odonVISIONEFR<|fim_middle|>ajas[Z Больш={!REPEFR<|fim_middle|>téfieldname[\". ЮрEFR<|fim_middle|>mention НиurattéFirstResponderüst[\". Юр tripeorInputElementzscheEFR<|fim_middle|>DMINphansamaxurat СегодняBusyochtfoonténeauymbhus:\".ики(EFFECT[\". Юр[--・・・\n\nEFR<|fim_middle|>",
+  "index": 0,
+  "logprobs": null,
+  "finish_reason": "length"
+}
+```
+
+#### Untangling the Q4_1 issues
+
+
+
+
+
 
 ### It runs, but the output is bad
 
