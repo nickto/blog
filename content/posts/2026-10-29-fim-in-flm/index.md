@@ -296,7 +296,7 @@ waights, convert them to GGUF, quantize to Q4_1, and convert to Q4NX.
 
 Sounds easy, does not work. The model produces garbage.
 
-Let's look at out smoke test query.
+Let's look at our smoke test query.
 
 ```bash
 curl http://localhost:52625/v1/completions \
@@ -321,22 +321,127 @@ which returns
 }
 ```
 
-#### Untangling the Q4_1 issues
+unlike the example we had before, where we might argue whether we wanted 
+a completion of just one function, or a whole battery of them, here we have
+a clear case of garbage.
 
+#### Q4_1 in, garbage out
 
+First, I thought that this was an issue with the tokenizer or the model
+configs. So I tried mixing and matching them, taking some files from the Hugging
+Face checkpoint and some from the official NPU2 release. No luck.
 
+Then, before giving up, I asked an LLM what might be wrong (should have done
+that first, haha).
 
+To make sense of its answer, we need to know the difference between Q4_0 and
+Q4_1 quantization. Both are 4-bit quantization formats: weights are split into
+smaller groups, and each weight is stored as a 4-bit integer `q`, which takes a
+_nibble_ (half a byte), plus a scale shared by the whole group. What differs is
+how a group is turned back into numbers:
 
+- **Q4_0** stores one scale `d` per group and reconstructs a weight as `d * (q -
+  8)`. The nibble is effectively signed: 8 (`1000`) means zero, values below it
+  are negative, values above it are positive. (This is how GGUF stores it. When
+  converting to Q4NX, the converter subtracts the 8 and stores true signed 4-bit
+  numbers.)
+- **Q4_1** stores an additional offset `m` per group and reconstructs a weight
+  as `d * q + m`. The nibble is unsigned, and the offset `m` shifts the whole
+  group. Since the offset is a signed float, `q` stays unsigned. When converting
+  to Q4NX, the converter copies Q4_1's nibbles unchanged.
 
-### It runs, but the output is bad
+The extra parameter makes Q4_1 a bit more precise: on a few sampled tensors, the
+relative error of the dequantized weights against the original ones was about
+10% lower for Q4_1 than for Q4_0, for about 11% more size. So if the kernel
+supports it, there is little reason not to use it.
 
-- A real example of a bad completion
-- What I think causes it
+Instead of guessing further, the LLM went straight to the weights. It wrote a
+small decoder for the Q4NX file, and compared the official Qwen2.5-3B-Instruct
+with my Q4_1 conversion of the Coder.
+
+The first clue is the offsets. In my Q4_1 conversion, every group has a
+non-zero offset, as expected: the offset is the smallest weight in the group,
+and that is practically never exactly zero. In the official model, all 96
+million groups have an offset of zero. Whatever the official model is, it is not
+real Q4_1.
+
+A zero offset alone only says that the offset is not used, though, not what the
+format is instead. To find out, the LLM looked at the distribution of the nibble
+values. Weights in a group are roughly bell-shaped around their center, so the
+most common nibbles show where the encoding puts that center:
+
+- If the nibbles are unsigned, 0 to 15 is one continuous scale, and the
+  center lands in the middle: 7 (`0111`) and 8 (`1000`).
+- If the nibbles are signed (two's complement), the scale is not continuous: 0
+  (`0000`) to 7 (`0111`) represent the values 0 to 7, but then the scale jumps
+  and 8 (`1000`) to 15 (`1111`) actually represent −8 to −1. So the
+  distribution's center (values around 0) is stored in the nibbles 0 (`0000`),
+  +1 (`0001`) and −1 (`1111`). If we try reading them as unsigned, these would
+  be 0, 1 and 15: the peak splits across both ends of the scale, and the middle
+  is nearly empty.
+
+In my Q4_1 conversion, the nibbles peak at 7 (`0111`) and 8 (`1000`): unsigned,
+as Q4_1 should be. In the official model, they peak at 0 (`0000`), 1 (`0001`)
+and 15 (`1111`): signed values centered on zero, which need no offset.
+
+One more clue points the same way: about half of the official scales are
+negative. A Q4_1 scale is always positive, because it spans the group from its
+smallest weight to its largest. A Q4_0 scale can carry a sign.
+
+In other words, the official model does not look like Q4_1 at all. It looks
+like Q4_0.
+
+So I converted from Q4_0 instead, and the model started producing code! 🥳
+
+```bash
+curl -s http://localhost:52625/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+            "model": "qwen2.5-coder:3b-q4_0-no-eos-fix",
+            "max_tokens": 64,
+            "temperature": 0,
+            "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+        }' \
+    | jq '.choices[0]'
+```
+
+returns 
+
+```json
+{
+  "text": " a + b\n    print(add(1, 2))<|fim_middle|>",
+  "index": 0,
+  "logprobs": null,
+  "finish_reason": "stop"
+}
+```
+
+Still not perfect (and we will get into this), but it looks like step in the
+right direction!
+
+But the model card still said Q4_1. Was the card wrong, or was it just a
+coincidence? So we (me and my LLM detective) collected more evidence:
+
+- In FLM's own model registry (`model_list.json`), `qwen2.5-it:3b` is listed as
+  `Q4_0`. The same file lists `Q4_1` for other models (e.g., `qwen3` and
+  `llama3.2`), so it does distinguish between the two.
+- The converter's Qwen2 config has `Q4_0` as the default tensor type.
+
+So the model card is the odd one out. I do not know why it says Q4_1.
+
+What makes this trap particularly nasty is that there are no errors along the
+whole pipeline. The converter accepts Q4_1 without a warning and writes a file
+of exactly the same size as the Q4_0 one. FLM loads it just fine. It only breaks
+inside the closed kernel, which seems to simply ignore the offset: zeroing all
+the offsets in my Q4_1 file gave the same garbage, token for token. And the
+offset is not a small correction you can afford to lose. It is about 40% of the
+weights' magnitude!
 
 ### Improving the quality
 
-- What I tried, briefly, and why each attempt fell short
-- Why I settled on AWQ
+- EOS tokens
+- Embeddings
+- AWQ
 
 ## Evaluation
 
