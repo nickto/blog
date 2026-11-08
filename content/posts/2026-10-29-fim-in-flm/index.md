@@ -523,8 +523,8 @@ curl -s http://localhost:52625/v1/completions \
 
 <details style="font-size: 0.8em; color: var(--secondary);">
   <summary>If you were reading carefully, ...</summary>
-... you could have noticed that we used the `-no-eos-fix` suffix in the model
-names we tested before, which was a bit of a spoiler 😅
+  ... you could have noticed that we used the <tt>-no-eos-fix</tt> suffix in the model
+  names we tested before, which was a bit of a spoiler 😅
 </details>
 
 It stops the special tokens from leaking.
@@ -566,13 +566,47 @@ token probabilities. In the Q4NX file, however, `lm_head` is a separate Q4_0
 tensor built from the same weights, and it stays 4-bit. So only the input side
 gets more precise.
 
-TODO: example prompt
+Let's test the full-precision embeddings fix on our smoke-test prompt:
 
-And on its own, this tweak did not fix the bad completions. It is still worth
-keeping, though, because it does not overlap with the fix in the next section:
-that one does not touch the embedding at all, so the two errors are independent.
-Whether the full-precision embedding adds anything on top of it, we will see in
-the [evaluation](#evaluation).
+```bash
+curl -s http://localhost:52625/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2.5-coder:3b-q4_0-bf16emb",
+    "max_tokens": 64,
+    "temperature": 0,
+    "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+  }' \
+| jq '.choices[0]'
+```
+
+It returns:
+
+```json
+{
+  "text": "\n    return a + b",
+  "index": 0,
+  "logprobs": null,
+  "finish_reason": "stop"
+}
+```
+
+So the implied code is
+
+```python
+def add(a, b):
+    
+    return a + b
+    return c
+```
+
+This code would actually work! The second return statement might attract a
+linter complaint at most. But it is still not great: clearly not what we
+wanted. So on its own, this tweak does not fully fix the bad completions. It is
+still worth keeping, though, because there is little downside and it does not
+conflict with the fix proposed in the next section. But whether the
+full-precision embeddings add anything on top of it, we will see in the
+[evaluation](#evaluation).
 
 #### Smarter quantization
 
