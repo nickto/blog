@@ -531,7 +531,48 @@ It stops the special tokens from leaking.
 
 #### Embeddings
 
-TODO
+Fixing the stop tokens doesn't help with the second issue: the code itself is
+still wrong. Given that the original F16 output on llama.cpp is fine, the
+obvious suspect is quantization. And there is one easy tweak that we can try.
+
+I quantize the whole GGUF to Q4_0 (`llama-quantize --pure`), so the embedding
+table, which is just a lookup table of tokens to vectors, gets rounded to 4 bits
+together with everything else. The Q4NX converter then dequantizes it and writes
+it to the output file as an ordinary BF16 tensor. But because it dequantizes
+from the 4-bit values, the result is no more precise than the 4-bit version:
+only the format changes.
+
+Yet the fact that Q4NX allows BF16 tensors at all lets us try a potential fix:
+use the full-precision embedding table.
+
+The obvious way to do it is to give the converter an F16 GGUF instead of the
+Q4_0 one, but that does not work: it fails with `ValueError: not enough values
+to unpack`. The converter cannot quantize F16 matrices itself.
+
+But there is a hacky way around that. The Q4NX model file is a plain
+[safetensors](https://huggingface.co/docs/safetensors) file, and it stores the
+embedding as a full BF16 tensor, even though the rest of the model is only
+4-bit. So we can simply replace the embedding tensor with the original one from
+the HF checkpoint.
+
+The new tensor has the same dtype and shape, and it is still just a lookup, so
+the file size and the runtime cost stay the same. And FLM is happy with the
+hack: it loads and serves the patched model without complaint. So there is
+little reason not to do it.
+
+There is one caveat, though. Qwen2.5-Coder-3B ties its input embedding to its
+output layer (`lm_head`), which turns the model's final hidden state back into
+token probabilities. In the Q4NX file, however, `lm_head` is a separate Q4_0
+tensor built from the same weights, and it stays 4-bit. So only the input side
+gets more precise.
+
+TODO: example prompt
+
+And on its own, this tweak did not fix the bad completions. It is still worth
+keeping, though, because it does not overlap with the fix in the next section:
+that one does not touch the embedding at all, so the two errors are independent.
+Whether the full-precision embedding adds anything on top of it, we will see in
+the [evaluation](#evaluation).
 
 #### Smarter quantization
 
