@@ -2,6 +2,9 @@
 title: "Get inline suggestions from a model on AMD NPU"
 date: 2026-10-29T12:30:49+02:00
 draft: true
+math: true
+ShowToc: true
+TocOpen: true
 ---
 
 My GitHub Copilot subscription, paid for by a previous employer, has recently
@@ -269,7 +272,7 @@ much you can do. At least without jumping through a lot of hoops.
 Unfortunately, even though FLM offers quite a few models, none of them are
 FIM capable. So we cannot use an off-the-shelf solution here.
 
-## Converting the model
+## Converting model for NPU
 
 One way of jumping through the hoops is to reuse the kernels of a model that is
 already supported, and only replace the weights. However, this is possible only
@@ -283,9 +286,7 @@ is officially supported and has the same architecture as Qwen2.5-Coder-3B, we
 can reuse its kernels and convert the Coder weights to Q4NX, the format FLM's
 models use.
 
-### The journey from GGUF to Q4NX
-
-#### The naive approach
+### GGUF to Q4NX: the naive approach
 
 [FLM Q4NX Converter](https://github.com/ROCm/FLM_Q4NX_Converter) expects a Q4_0
 or Q4_1 quantized weights in GGUF format. And the [model's
@@ -325,7 +326,7 @@ Unlike the example we had before, where we might argue whether we wanted
 a completion of just one function, or a whole battery of them, here we have
 a clear case of garbage.
 
-#### Q4_1 in, garbage out
+### Q4_1 in, garbage out
 
 First, I thought that this was an issue with the tokenizer or the model
 configs. So I tried mixing and matching them, taking some files from the Hugging
@@ -340,14 +341,14 @@ smaller groups, and each weight is stored as a 4-bit integer `q`, which takes a
 _nibble_ (half a byte), plus a scale shared by the whole group. What differs is
 how a group is turned back into numbers:
 
-- **Q4_0** stores one scale `d` per group and reconstructs a weight as `d * (q -
-  8)`. The nibble is effectively signed: 8 (`1000`) means zero, values below it
+- **Q4_0** stores one scale $d$ per group and reconstructs a weight as $d \times (q -
+  8)$. The nibble is effectively signed: 8 (`1000`) means zero, values below it
   are negative, values above it are positive. (This is how GGUF stores it. When
   converting to Q4NX, the converter subtracts the 8 and stores true signed 4-bit
   numbers.)
-- **Q4_1** stores an additional offset `m` per group and reconstructs a weight
-  as `d * q + m`. The nibble is unsigned, and the offset `m` shifts the whole
-  group. Since the offset is a signed float, `q` stays unsigned. When converting
+- **Q4_1** stores an additional offset $m$ per group and reconstructs a weight
+  as $d \times q + m$. The nibble is unsigned, and the offset $m$ shifts the whole
+  group. Since the offset is a signed float, $q$ stays unsigned. When converting
   to Q4NX, the converter copies Q4_1's nibbles unchanged.
 
 The extra parameter makes Q4_1 a bit more precise: on a few sampled tensors, the
@@ -437,7 +438,7 @@ the offsets in my Q4_1 file gave the same garbage, token for token. And the
 offset is not a small correction you can afford to lose. It is about 40% of the
 weights' magnitude!
 
-### Improving the quality
+## Improving the quality
 
 So we got something that resembles the actual code, using the model converted
 for FLM. However, there are two conspicuous issues. 
@@ -460,7 +461,7 @@ def add(a, b):
 It got the indentation wrong, and even if we ignore the extra space, the
 function will not work.
 
-#### Dealing with special tokens
+### Dealing with special tokens
 
 There are five special tokens in the Qwen2.5-Coder tokenizer that matter for
 FIM:
@@ -529,7 +530,7 @@ curl -s http://localhost:52625/v1/completions \
 
 It stops the special tokens from leaking.
 
-#### Embeddings
+### Restoring precise embeddings
 
 Fixing the stop tokens doesn't help with the second issue: the code itself is
 still wrong. Given that the original F16 output on llama.cpp is fine, the
@@ -608,9 +609,234 @@ conflict with the fix proposed in the next section. But whether the
 full-precision embeddings add anything on top of it, we will see in the
 [evaluation](#evaluation).
 
-#### Smarter quantization
+### Smarter quantization
 
-TODO
+With the special tokens and the embeddings sorted out, the completions were
+still bad. And not only on our smoke-test prompt: on a larger (but still
+ad-hoc) set of prompts, the model doubled tokens (`ret ret`), dropped
+them, threw in stray Cyrillic, or returned nothing at all.
+
+Was it FLM's fault? Partly. The same Q4_0 GGUF in llama.cpp did much better, yet
+it still showed milder versions of the same flaws. So FLM made things worse, but
+the root of the problem seemed to be somewhere else.
+
+Since llama.cpp suffered from the same flaws, the problem had to be in the model
+file itself, so the quantization was the main suspect. But FLM's official
+Qwen2.5-3B-Instruct is also Q4_0, and it works fine. 
+
+{{< collapse summary="So what does the official model do differently?" openByDefault=false >}}
+
+FLM does not ship an official Coder model to compare against. So I ran my
+pipeline on Qwen2.5-3B-Instruct instead and compared the result with the
+official Q4NX file. The idea was to double-check my conversion: is my pipeline
+producing the same quantized weights given the same full-precision input? I
+expected them to be bit-dentical: after all, FLM does not openly claim to do any
+additional fine-tuning or other optimisation. But the weights were different.
+Only about a quarter of the tensors (109 of 435: the embedding, the final norm,
+and almost all of the biases) were bit-identical. 
+
+{{< /collapse >}}
+
+So, it turns out that the weight matrices differed and they did so in a very particular way.
+
+To explain how, we need to talk about [AWQ: Activation-aware Weight
+Quantization](https://arxiv.org/abs/2306.00978) (Lin, J., et al., 2023). 
+
+#### Scrutinizing Q4_0 errors
+
+In order to understand it, let's recap how Q4_0 works, and where the rounding
+errors come from. 
+
+Q4_0 splits the weights into small groups (groups of 32 weights to be precise,
+but it is not important for us). Each group gets one scale $d$, in order to fit
+the range of the original floating point values into the −8 to +7 range of
+4-bit integers. This can be described more formally as $d = \max |w| \div 8$.
+
+Thus, every weight is rounded to the nearest multiple of $d$, so it is off by at
+most $d \div 2$, no matter how large or small the weight is.
+
+Let's have a look at the example. Here is a toy group of four weights. The
+largest one is −0.80, so $d = 0.80 \div 8 = 0.1$, and $d \div 2 = 0.05$:
+
+|   $w$ | $w \div d$ | Integer | Rounded $w$ | Rounding error |
+| ----: | ---------: | ------: | ----------: | -------------: |
+| −0.80 |       −8.0 |      −8 |       −0.80 |     0.00       |
+|  0.14 |        1.4 |       1 |        0.10 |     0.04 ≤ 0.05|
+| −0.50 |       −5.0 |      −5 |       −0.50 |     0.00       |
+|  0.33 |        3.3 |       3 |        0.30 |     0.03 ≤ 0.05|
+
+Only the integers are stored, plus one $d$ per group.
+
+What we care about, though, is not the rounding error of the weights
+themselves, but the error they produce in the layer's output. Let's have a look at a single layer example:
+`$$y = \sigma(W x) = \sigma(h),$$`
+where 
+
+- $W$ is an $m \times n$ weight matrix, 
+- $x$ is the $n \times 1$ input vector, 
+- $h = W x$ is the $m \times 1$ output of the linear part, before the
+  non-linearity is applied,
+- $\sigma$ is a non-linear activation function,
+- and $y$ is the $m \times 1$ output. 
+
+(Except for the first layer) the input is also an output, but that of the
+previous linear layer after the non-linear activation function is applied. That
+is why the input of a layer is called an _activation_ (not to be confused with
+the activation function `$\sigma$`: the activation is what comes out of it).
+
+Another important term that we will use is a _channel_. The term comes from
+images, where each pixel has a red, a green and a blue channel. Neural networks
+kept the term for the separate features at each position, and in a linear
+layer, each input feature $x_i$ is its own channel. Consider the following
+example:
+`$$
+y = \sigma \left( W \cdot x \right) =
+\begin{bmatrix}
+  y_1 \\
+  y_2 \\
+  y_3
+\end{bmatrix} =
+\sigma \left(
+\begin{bmatrix}
+  w_{11} & w_{12} & w_{13} \\
+  w_{21} & w_{22} & w_{23} \\
+  w_{31} & w_{32} & w_{33}
+\end{bmatrix}
+\begin{bmatrix}
+  x_1 \\
+  x_2 \\
+  x_3
+\end{bmatrix} \right) = 
+\sigma \left(
+\begin{bmatrix}
+  \mathbf{w_{11} x_1} + w_{12} x_2 + w_{13} x_3 \\
+  \mathbf{w_{21} x_1} + w_{22} x_2 + w_{23} x_3 \\
+  \mathbf{w_{31} x_1} + w_{32} x_2 + w_{33} x_3
+\end{bmatrix}
+\right)
+$$`
+Notice how the activation `$x_1$` contributes to the output only via column 1 of
+the matrix $W$. So each channel has its own column of weights, and whatever
+happens to channel $i$---both `$x_i$` and its column---affects every output. Also notice the contrary: each output is a sum with one term from every channel.
+
+#### Not all channels are born equal
+
+Quantization groups run along the rows, so each weight in a group belongs to a
+different channel. And not all channels are equally important
+for the output. We have already shown that weights have rounding errors, but
+their errors are all within $d \div 2$ in a group. What makes them drastically
+unequal are the activations they are applied to. To illustrate this, let's
+extend our numerical example above with activations $x$.
+
+| Channel |     $w$ |  $x$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
+| ------: | ----: | -: | --------: | ----: | --------: |
+|       1 | −0.80 |  1 |     −0.80 |  0.00 |      0.00 |
+|       2 |  0.14 | 10 |      0.10 |  0.04 |  **0.40** |
+|       3 | −0.50 |  1 |     −0.50 |  0.00 |      0.00 |
+|       4 |  0.33 |  1 |      0.30 |  0.03 |      0.03 |
+|   Total |       |    |           |       |  **0.43** |
+
+The rounding errors of channels 2 and 4 are about the same, but channel 2
+contributes almost all of the output error. So some channels are clearly more
+important for the output and we want to focus retaining their precision, even at
+the expense of other, less important channels. AWQ exploits this in two ways:
+scaling and clipping: the former improves precision by focusing on channels with
+large activations, and the letter gives up precision in low activation channels
+in order to improve it in the rest.
+
+#### Scaling: make activations smaller
+
+If the activation is large, the contribution of this channel to the output error
+is also large (channel 2 in our example). So AWQ shrinks large activations,
+which decreases the total output error.
+
+Why does this work? Let's look at the error of output $j$ before the
+non-linearity $\sigma$ is applied:
+`$$
+\epsilon_j = \hat{h}_j - h_j = \sum_i \hat{w}_{ji} x_i - \sum_i w_{ji} x_i =
+\sum_i (\hat{w}_{ji} - w_{ji}) x_i,
+$$`
+where `$\hat{w}_{ji}$` is the rounded weight. So every channel $i$ adds its
+activation times the rounding error of its weight. The rounding error
+`$\hat{w}_{ji} - w_{ji}$` is at most $d \div 2$, no matter what the weight is,
+so
+`$$
+|\epsilon_j| \le \frac{d}{2} \sum_i |x_i|.
+$$`
+<details style="font-size: 0.8em; color: var(--secondary); margin-top: -4rem;">
+  <summary>Strictly speaking, ...</summary>
+  ... $d$ is different for each group of weights, but this does not change the intuition.
+</details>
+<br/>
+
+So the only knob we can tweak in order to reduce `$|\epsilon_j|$` is to make the
+activations `$x_i$` smaller.
+
+Of course, we cannot just shrink an activation: the layer would then compute
+something else. So we divide the activation by a scaling factor $s$, and
+multiply the corresponding column of weights by the same $s$. Then every term
+`$w_{ji} x_i$` of `$h_j$` stays the same:
+`$$
+(s \cdot w_{ji}) \cdot \left(x_i \cdot \frac{1}{s}\right) = w_{ji} x_i.
+$$`
+Since $h$ stays the same, $y$ also stays exactly the same. Scaling the weight up
+does not make its rounding error larger either: the bound of $d \div 2$ does not
+depend on the weight, only on $d$. Unless the scaled weight becomes the largest
+weight in the group, and we need to pick a new $d$: this is the limit of how
+much we can scale without giving up anything else.
+
+Back to our example. With $s = 4$ for channel 2, its weight becomes
+$0.14 \times 4 = 0.56$ and its activation $10 \div 4 = 2.5$. The largest weight
+is still −0.80, so $d$ is still 0.1:
+
+| Channel |   $w$ | $x$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
+| ------: | ----: | --: | ----------: | -------------: | --------------------------------: |
+|       1 | −0.80 |   1 |       −0.80 |           0.00 |                              0.00 |
+|       2 |  0.56 | 2.5 |        0.60 |           0.04 |                          **0.10** |
+|       3 | −0.50 |   1 |       −0.50 |           0.00 |                              0.00 |
+|       4 |  0.33 |   1 |        0.30 |           0.03 |                              0.03 |
+|   Total |       |     |             |                |                          **0.13** |
+
+The rounding error of channel 2 is still 0.04, but it is now multiplied by 2.5
+instead of 10. So the contribution of channel 2 dropped four times, from 0.40 to
+0.10, and the total error dropped from 0.43 to 0.13.
+
+So why not take a huge $s$? Because at some point the scaled weight becomes the
+largest in its group, so we need to pick a larger $d$, which affects decreases
+the precision for the rest of the group. And remember that $s$ applies to the
+whole column, which crosses many groups, so the same $s$ has to work for all of
+them. Too little scaling does not help, too much hurts, so the right $s$ has to
+be found by a search.
+
+But how do we know which activations are large? Unlike the weights, they are
+not part of the model: they depend on the data. AWQ solves this with
+_calibration_: it runs the model on some representative sample and records
+the activations of each layer. The average magnitude of each channel tells it
+which channels are important.
+
+AWQ then scales the channels with larger average activations more. How much
+more is found by a search, layer by layer: AWQ tries several sets of scales,
+quantizes the scaled weights for each, runs the calibration activations through
+the layer, and keeps the set whose $h$ is closest to the original.
+
+{{< collapse summary="And the division by $s$ comes for free at inference time." openByDefault=false >}}
+
+This does not work in _every_ neural network, but it does in most LLMs.
+For instance, in our toy example this wouldn't work, because we feed the 
+ouput of non-linearity, $\sigma(Wx)$, directly as activation into the next layer.
+
+But in most transformers, the attention and MLP blocks start with some kind  
+of layer normalization. In Qwen2.5's case, for example, it's RMSNorm, which  
+multiplies each channel by its own learned weight. For the linear layers  
+right after it, we divide that weight by $s$. For other linear layers there are  
+similar tricks.
+
+This highlights, however, that AWQ cannot treat the model as a black box: 
+the architecture drives the decision on where to fold the scales, and 
+whether the folding is possible at all.
+
+{{< /collapse >}}
+
 
 ## Evaluation
 
