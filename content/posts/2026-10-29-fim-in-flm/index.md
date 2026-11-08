@@ -21,7 +21,7 @@ the function code.
 Models used for this type of task are commonly trained with the
 _fill-in-the-middle_ (FIM) objective, proposed by [Bavarian, M., et al. in
 2022](https://arxiv.org/abs/2207.14255). This is not a different model
-architecture, but rather a different training objective, where given the text
+architecture, but rather a different training objective, where, given the text
 before and after the missing part, the model should fill in the missing part. 
 
 Technically, most LLMs should be able to do the task if we describe what we
@@ -106,7 +106,7 @@ In the case of Qwen 2 models, this request should be formatted as the following 
 "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
 ```
 
-where we first supply the prefix, or the part goes before the completion, then
+where we first supply the prefix, or the part that goes before the completion, then
 the suffix, or the part that goes after the completion, and ask the model to
 fill in the middle, or the actual completion. So the full request looks like 
 this
@@ -114,7 +114,7 @@ this
 ```json
 {
   "model": "<model name>",
-  "max_tokens": 32,
+  "max_tokens": 64,
   "temperature": 0,
   "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
 }
@@ -124,7 +124,7 @@ and full `curl` command for the F16 Qwen 2.5 Coder 3B model, looks like this
 (assuming that llama.cpp is running on `localhost:8080`):
 
 ```bash
-curl http://localhost:8080/v1/completions \
+curl -s http://localhost:8080/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
           "model": "qwen2.5-coder-3b-f16",
@@ -166,8 +166,8 @@ def div(a, b):
     return c    
 ```
 
-We can discuss whether this exactly what we wanted or not, but at least it is
-hard to argue that this is a totally valid completion.
+We can discuss whether this is exactly what we wanted or not, but at least it is
+hard to argue that this is not a perfectly valid completion.
 
 ## NPU
 
@@ -218,7 +218,7 @@ FLM offers a pretty [wide choice of smaller
 LLMs](https://fastflowlm.com/docs/models/) (and a couple of other neural
 networks). 
 
-Among many, they ship:
+Among many others, they ship:
 
 - [Qwen3.6-35B-A3B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen36-35b-a3b),
   which is powerful, yet fast, because only a small part of it is used for each
@@ -233,7 +233,7 @@ Among many, they ship:
 The list is constantly being updated, so it's worth keeping an eye on. E.g., last
 time I checked,
 [Qwen3.8-27B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen38-27b)
-was not there, yet, but is there now.
+was not there yet, but is there now.
 
 Moreover, besides the usual `/v1/chat/completions` endpoint, which is used for
 chats, FLM also supports the [legacy
@@ -251,8 +251,8 @@ suggestion.
 
 This may sound like a minor detail, but many serverless model providers offer
 only the chat endpoint, so you cannot use them for inline completions, even if
-the model itself was trained for FIM. Technically, one could find a workaround
-maybe, but the existing tools expect the `/v1/completions` endpoint (or an even
+the model itself was trained for FIM. Technically, one could maybe find a
+workaround, but the existing tools expect the `/v1/completions` endpoint (or an even
 less commonly supported `/v1/fim/completions`).
 
 #### The bad
@@ -266,8 +266,8 @@ commercial, but you cannot read or change them. And these kernels are the part
 that actually runs on the NPU, so if the model is not on the list, there is not 
 much you can do. At least without jumping through a lot of hoops.
 
-Unfortunately, even though FLM offers quite a few models, none of them are the
-FIM capable. So we cannot use an off-the-shelve solution here.
+Unfortunately, even though FLM offers quite a few models, none of them are
+FIM capable. So we cannot use an off-the-shelf solution here.
 
 ## Converting the model
 
@@ -290,16 +290,16 @@ models use.
 [FLM Q4NX Converter](https://github.com/ROCm/FLM_Q4NX_Converter) expects a Q4_0
 or Q4_1 quantized weights in GGUF format. And the [model's
 card](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct)
-says that is uses the Q4_1 quantization, so we go to
-[Huggingace](https://huggingface.co/Qwen/Qwen2.5-Coder-3B), download the
-waights, convert them to GGUF, quantize to Q4_1, and convert to Q4NX.
+says that it uses the Q4_1 quantization, so we go to
+[Hugging Face](https://huggingface.co/Qwen/Qwen2.5-Coder-3B), download the
+weights, convert them to GGUF, quantize to Q4_1, and convert to Q4NX.
 
 Sounds easy, does not work. The model produces garbage.
 
 Let's look at our smoke test query.
 
 ```bash
-curl http://localhost:52625/v1/completions \
+curl -s http://localhost:52625/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "qwen2.5-coder:3b-q4_1-no-eos-fix",
@@ -321,7 +321,7 @@ which returns
 }
 ```
 
-unlike the example we had before, where we might argue whether we wanted 
+Unlike the example we had before, where we might argue whether we wanted 
 a completion of just one function, or a whole battery of them, here we have
 a clear case of garbage.
 
@@ -416,7 +416,7 @@ returns
 }
 ```
 
-Still not perfect (and we will get into this), but it looks like step in the
+Still not perfect (and we will get into this), but it looks like a step in the
 right direction!
 
 But the model card still said Q4_1. Was the card wrong, or was it just a
@@ -485,7 +485,7 @@ By default, FLM's Instruct model stops only on `<|endoftext|>` and `<|im_end|>`
 FIM tokens appears in the output, the model has most likely gone astray, so the
 inline completion should stop too.
 
-There are also two tokens other tokens, which makes sense to add to our stop
+There are also two other tokens, which make sense to add to our stop
 token set:
 
 - `<|repo_name|>`: indicates the start of the repository name, which opens a
@@ -497,7 +497,7 @@ token set:
 So I patch `tokenizer_config.json` and `config.json` to stop on all these
 tokens.
 
-It does not solve the problem with the code generated being wrong, but let's us
+It does not solve the problem with the code generated being wrong, but lets us
 quickly validate whether it solves the problem of leaking special tokens.
 
 ```bash
@@ -505,8 +505,8 @@ curl -s http://localhost:52625/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "qwen2.5-coder:3b-q4_0",
-     "max_tokens": 64,
-     "temperature": 0,
+    "max_tokens": 64,
+    "temperature": 0,
     "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
   }' \
 | jq '.choices[0]'
