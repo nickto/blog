@@ -300,14 +300,14 @@ Let's look at our smoke test query.
 
 ```bash
 curl http://localhost:52625/v1/completions \
-    -H "Content-Type: application/json" \
-    -d '{
-          "model": "qwen2.5-coder:3b-q4_1-no-eos-fix",
-          "max_tokens": 64,
-          "temperature": 0,
-          "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
-        }' \
-    | jq '.choices[0]'
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2.5-coder:3b-q4_1-no-eos-fix",
+    "max_tokens": 64,
+    "temperature": 0,
+    "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+  }' \
+| jq '.choices[0]'
 ```
 
 which returns
@@ -395,14 +395,14 @@ So I converted from Q4_0 instead, and the model started producing code! 🥳
 
 ```bash
 curl -s http://localhost:52625/v1/completions \
-    -H "Content-Type: application/json" \
-    -d '{
-            "model": "qwen2.5-coder:3b-q4_0-no-eos-fix",
-            "max_tokens": 64,
-            "temperature": 0,
-            "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
-        }' \
-    | jq '.choices[0]'
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2.5-coder:3b-q4_0-no-eos-fix",
+    "max_tokens": 64,
+    "temperature": 0,
+    "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+  }' \
+| jq '.choices[0]'
 ```
 
 returns 
@@ -439,9 +439,103 @@ weights' magnitude!
 
 ### Improving the quality
 
-- EOS tokens
-- Embeddings
-- AWQ
+So we got something that resembles the actual code, using the model converted
+for FLM. However, there are two conspicuous issues. 
+
+The first one is the special token leakage, i.e. `<|fim_middle|>`. Not only
+special tokens should not be returned as plain text, but also the usage of this
+token does not make sense: it is used to indicate the start of the middle
+section, and it is what we end our prompt with.
+
+But even if we strip this special token, there is still the second issue: the
+completed code is actually bad:
+
+```python
+def add(a, b):
+     a + b
+    print(add(1, 2))
+    return c
+```
+
+It got the indentation wrong, and even if we ignore the extra space, the
+function will not work.
+
+#### Dealing with special tokens
+
+There are five special tokens in the Qwen2.5-Coder tokenizer that matter for
+FIM:
+
+- `<|fim_prefix|>`: indicates the start of the text before the requested
+  completion.
+- `<|fim_middle|>`: indicates the start of the requested completion.
+- `<|fim_suffix|>`: indicates the start of the text after the requested
+  completion.
+- `<|fim_pad|>`: a padding token used in training. It is not used at inference.
+- `<|endoftext|>`: not FIM-specific, but in training it follows the middle
+  section, so it should be the token that ends the requested completion.
+
+FLM's official model is an Instruct one, so one more token is worth knowing
+about:
+
+- `<|im_end|>`: marks the end of a turn in the chat format. It is not used in
+  FIM prompts.
+
+By default, FLM's Instruct model stops only on `<|endoftext|>` and `<|im_end|>`
+(and the HF base Coder checkpoint only on `<|endoftext|>`). But if any of the
+FIM tokens appears in the output, the model has most likely gone astray, so the
+inline completion should stop too.
+
+There are also two tokens other tokens, which makes sense to add to our stop
+token set:
+
+- `<|repo_name|>`: indicates the start of the repository name, which opens a
+  repository-level prompt.
+- `<|file_sep|>`: separates files in a repository-level prompt. It is followed
+  by the file path and then the file's content. If the model emits it, it is
+  done with the current file, so the inline completion should stop.
+
+So I patch `tokenizer_config.json` and `config.json` to stop on all these
+tokens.
+
+It does not solve the problem with the code generated being wrong, but let's us
+quickly validate whether it solves the problem of leaking special tokens.
+
+```bash
+curl -s http://localhost:52625/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2.5-coder:3b-q4_0",
+     "max_tokens": 64,
+     "temperature": 0,
+    "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+  }' \
+| jq '.choices[0]'
+```
+
+```json
+{
+  "text": " a + b\n    print(add(1, 2))",
+  "index": 0,
+  "logprobs": null,
+  "finish_reason": "stop"
+}
+```
+
+<details style="font-size: 0.8em; color: var(--secondary);">
+  <summary>If you were reading carefully, ...</summary>
+... you could have noticed that we used the `-no-eos-fix` suffix in the model
+names we tested before, which was a bit of a spoiler 😅
+</details>
+
+It stops the special tokens from leaking.
+
+#### Embeddings
+
+TODO
+
+#### Smarter quantization
+
+TODO
 
 ## Evaluation
 
@@ -457,9 +551,6 @@ weights' magnitude!
 - A bit slow: latency on the GPU is better
 - The answer to the opening question: is it worth using instead of Copilot?
 
-## References and links
-
-[^1]: Bavarian, M., et al. (2022). [Efficient training of language models to fill in the middle](https://arxiv.org/abs/2207.14255). arXiv.
 
 <!--Saving for reference-->
 <!--
