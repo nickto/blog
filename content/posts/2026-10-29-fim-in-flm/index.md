@@ -730,7 +730,7 @@ extend our numerical example above with activations $x$.
 
 | Channel |     $w$ |  $x$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
 | ------: | ----: | -: | --------: | ----: | --------: |
-|       1 | −0.80 |  1 |     −0.80 |  0.00 |      0.00 |
+|       1 | −0.80 | 0.1 |     −0.80 |  0.00 |      0.00 |
 |       2 |  0.14 | 10 |      0.10 |  0.04 |  **0.40** |
 |       3 | −0.50 |  1 |     −0.50 |  0.00 |      0.00 |
 |       4 |  0.33 |  1 |      0.30 |  0.03 |      0.03 |
@@ -738,10 +738,10 @@ extend our numerical example above with activations $x$.
 
 The rounding errors of channels 2 and 4 are about the same, but channel 2
 contributes almost all of the output error. So some channels are clearly more
-important for the output and we want to focus retaining their precision, even at
+important for the output and we want to focus on retaining their precision, even at
 the expense of other, less important channels. AWQ exploits this in two ways:
 scaling and clipping: the former improves precision by focusing on channels with
-large activations, and the letter gives up precision in low activation channels
+large activations, and the latter gives up precision in low activation channels
 in order to improve it in the rest.
 
 #### Scaling: make activations smaller
@@ -791,7 +791,7 @@ is still −0.80, so $d$ is still 0.1:
 
 | Channel |   $w$ | $x$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
 | ------: | ----: | --: | ----------: | -------------: | --------------------------------: |
-|       1 | −0.80 |   1 |       −0.80 |           0.00 |                              0.00 |
+|       1 | −0.80 | 0.1 |       −0.80 |           0.00 |                              0.00 |
 |       2 |  0.56 | 2.5 |        0.60 |           0.04 |                          **0.10** |
 |       3 | −0.50 |   1 |       −0.50 |           0.00 |                              0.00 |
 |       4 |  0.33 |   1 |        0.30 |           0.03 |                              0.03 |
@@ -802,7 +802,7 @@ instead of 10. So the contribution of channel 2 dropped four times, from 0.40 to
 0.10, and the total error dropped from 0.43 to 0.13.
 
 So why not take a huge $s$? Because at some point the scaled weight becomes the
-largest in its group, so we need to pick a larger $d$, which affects decreases
+largest in its group, so we need to pick a larger $d$, which decreases
 the precision for the rest of the group. And remember that $s$ applies to the
 whole column, which crosses many groups, so the same $s$ has to work for all of
 them. Too little scaling does not help, too much hurts, so the right $s$ has to
@@ -837,6 +837,86 @@ whether the folding is possible at all.
 
 {{< /collapse >}}
 
+#### Clipping: do not let outliers set the range
+
+Scaling tackled the activations in our error bound:
+`$$
+|\epsilon_j| \le \frac{d}{2} \sum_i |x_i|.
+$$`
+Clipping tackles the other term: $d$.
+
+Remember that $d$ is set by the largest weight in the group. So a single outlier
+forces a coarse grid on all the weights in the group. That is fine if the
+outlier belongs to an important channel. But if its activation is small, we waste
+the precision of the whole group on a weight whose error barely matters.
+
+Clipping sets the ceiling on the magnitude of weights in our group below the
+current largest value. So the outliers above this cap get a worse error than
+before the clipping. It sounds bad, but could actually be fine, if the channels to
+which these outliers belong were not important. At the same time, we can now
+decrease $d$, thus making the grid finer, which on average should improve the 
+errors of the rest of the weights in the group.
+
+Thus, we trade the error of insignificant outliers for better precision of 
+important channels. If the total error decreases, we gain precision. 
+
+Back to our toy example before scaling. Channel 1 has the largest weight,
+−0.80, but its activation is only 0.1. Let's cap the group at 0.64, so
+$d$ becomes  $0.64 \div 8 = 0.08$ and $d \div 2 = 0.04$, down from 0.05:
+
+| Channel |   $w$ | $x$ | Clipped $w$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
+| ------: | ----: | --: | ----------: | ----------: | -------------: | --------------------------------: |
+|       1 | −0.80 | 0.1 |       −0.64 |       −0.64 |           0.16 |                              0.02 |
+|       2 |  0.14 |  10 |        0.14 |        0.16 |           0.02 |                          **0.20** |
+|       3 | −0.50 |   1 |       −0.50 |       −0.48 |           0.02 |                              0.02 |
+|       4 |  0.33 |   1 |        0.33 |        0.32 |           0.01 |                              0.01 |
+|   Total |       |     |             |             |                |                          **0.25** |
+
+Channel 1 is now off by 0.16, which sounds like huge rounding error. And it is,
+but only for the weight itself, which we ultimately don't care about. And
+multiplied by an activation of 0.1, the contribution of this channel in the
+output error shrinks to 0.02. Meanwhile, the finer grid halves the error of the
+important channel 2, and the total drops from 0.43 to 0.25.
+
+So why not clip harder? Because the deeper we cut, the larger the error of the
+outlier, and at some point the cap starts cutting into weights that do matter.
+Cap the group at 0.32, for example, and channels 3 and 4 get clipped too: the
+total error climbs back to 0.44, worse than no clipping at all.
+
+Just like with scaling, the right cap depends on the activations, so AWQ finds
+it with the calibration data. For each group, it tries a range of caps and keeps
+the one with the smallest output error. This happens after scaling, on the
+already scaled weights, so the two methods can be combined: scaling protects the
+important channels, and clipping prevents the unimportant ones from driving $d$.
+
+Compared to scaling, there is one important aspect that we should be aware
+though. Scaling does not change what the layer computes, while clipping does:
+there is no analogue of the invers scale for clipping. But given that we are
+already heavily quantizing the model, the weights are goind to suffer anyway.
+Clipping just helps controls where the error goes.
+
+Importantly, all of this happens in full prevision _before_ quantization. The
+result is a normal checkpoint with the exact same architecture, computes almost
+the same values (only clipping changes it a bit). It's just that these
+tranfsormations help decreasing the rounding errors in the subsequent 4-bit
+quantization. 
+
+We can then quantize it with plain Q4_0, as before. Since `llama-quantize` picks
+the step from the largest weight in each group, it automatically picks up the
+clipped values. And this is exactly the fingerprint my LLM detective found in
+the official model:
+
+- Some weight columns are multiplied by a scale $s$, and the layers right
+  before them are adjusted to divide the matching activations by the same $s$,
+  just like in the scaling trick above.
+- There is one place where AWQ could fold a scale, but
+  [AutoAWQ](https://github.com/casper-hansen/AutoAWQ), the popular AWQ
+  implementation, does not do it for models like Qwen2.5. The official model is
+  not scaled there either, which points to AutoAWQ specifically, not just to AWQ
+  in general.
+- In some layers, about 30% of the groups are clipped, while in others there is
+  no clipping at all. The unclipped layers are the ones AutoAWQ deliberately
+  leaves alone, because errors there distort attention.
 
 ## Evaluation
 
