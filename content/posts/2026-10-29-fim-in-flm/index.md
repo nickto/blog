@@ -918,6 +918,112 @@ the official model:
   no clipping at all. The unclipped layers are the ones AutoAWQ deliberately
   leaves alone, because errors there distort attention.
 
+### Replicating the official
+
+So the likely recipe to get the performance similar to the officially
+distributed models is AWQ → GGUF → Q4_0 → Q4NX. So far, we have already done all
+the steps except for AWQ. And applying it is straightforward, if using AutoAWQ.
+
+AWQ's search needs to simulate rounding to measure the error, and by default
+AutoAWQ simulates something other than Q4_0. To get as close to Q4_0 as AutoAWQ
+allows, we need to set 4 bits (`w_bit=4`), groups of 32 (`q_group_size=32`), and
+signed values without an offset (`zero_point=False`).
+
+For calibration, I used AutoAWQ's default dataset, a sample of
+[the Pile](https://arxiv.org/abs/2101.00027): a large mix of English text from
+the web, books, scientific papers, code, and more. This is, arguably, not the
+best dataset for calibrating an in-line code completion model, but this
+exercise is a "proof of pipeline" rather than a hunt for the best possible
+performance.
+
+Once AutoAWQ is done, the rest of the pipeline is unchanged: AutoAWQ outputs
+the same format as the original HF checkpoint, just with slightly different values.
+So the next steps are the same: GGUF → Q4_0 → Q4NX. And since AWQ does
+not touch the embedding, the full-precision embedding trick from the previous
+section still applies.
+
+In practice, there were a couple of gotchas when running on CPU:
+
+- There seems to be a bug in AutoAWQ, which shows up only on CPU. AutoAWQ backs
+  up the weights with `v.cpu()`, which makes a copy when moving data from the
+  GPU to the CPU. But if the tensor is already on the CPU, there is nothing to
+  move, so it returns the same tensor. So when the weights are modified in
+  place, the "backup" changes with them, and the weights end up scaled twice.
+  As usual with annoying bugs, nothing crashes. But the resulting model does not
+  work. Now my pipeline patches this part of the code in AutoAWQ to
+  `v.cpu().clone()`, which always makes a copy.
+- It is painfully slow on CPU: about 108 seconds per layer, so almost two hours
+  for the 3B model. I even tried optimizing the number of threads, but the gains
+  were negligible. When you know that it will work, it is fine. But while
+  developing, mistakes are the norm, and every mistake gets expensive. After a
+  few failures, I lost patience and moved the AutoAWQ step to a GPU instance in
+  the cloud.
+
+Time for our smoke test again:
+
+```bash
+curl -s http://localhost:52625/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2.5-coder:3b-awq-pile-q4_0",
+    "max_tokens": 64,
+    "temperature": 0,
+    "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+  }' \
+| jq '.choices[0]'
+```
+
+It returns:
+
+```json
+{
+  "text": "c = a + b\n    return c\n\ndef sub(a, b):\n    c = a - b",
+  "index": 0,
+  "logprobs": null,
+  "finish_reason": "stop"
+}
+```
+
+This is, word for word, the beginning of what the F16 model gave us in
+llama.cpp at the very start of this post. The model wants to write a whole
+battery of functions again, and the implied code is:
+
+```python
+def add(a, b):
+    c = a + b
+    return c
+
+def sub(a, b):
+    c = a - b
+    return c
+```
+
+And with the full-precision embeddings on top
+(`qwen2.5-coder:3b-awq-pile-q4_0-bf16emb`), it returns:
+
+```json
+{
+  "text": "\n    c = a + b",
+  "index": 0,
+  "logprobs": null,
+  "finish_reason": "stop"
+}
+```
+
+So the implied code is
+
+```python
+def add(a, b):
+    
+    c = a + b
+    return c
+```
+
+Exactly what we wanted, give or take an empty line! Of course, this is a single
+prompt, and the single prompt might be not representative. How much AWQ helps,
+and whether the full-precision embeddings add anything on top of it, we will see
+in the [evaluation](#evaluation).
+
 ## Evaluation
 
 - What SAFIM is and why I used it
