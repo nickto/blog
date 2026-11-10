@@ -1026,11 +1026,32 @@ in the [evaluation](#evaluation).
 
 ## Evaluation
 
-- What SAFIM is and why I used it
-- Quality: processing variants vs GGUF alternatives (benchmark in progress)
-- Speed: NPU vs GPU latency
-- Maybe: official Instruct model vs this pipeline
-- Maybe: power draw, NPU vs GPU
+### SAFIM
+
+What is it and why I use it? 
+
+TODO
+
+### Results
+![SAFIM pass rate](safim_pass_rate_hpd.svg)
+
+![Each variant vs. full-precision](safim_diff_vs_f16.svg)
+
+![Effect of AWQ](safim_diff_awq.svg)
+![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
+![Effect of quantization](safim_diff_quantization.svg)
+![Effect of runtime](safim_diff_runtime.svg)
+
+
+![SAFIM test outcomes](safim_outcomes.svg)
+
+### Speed
+
+TODO
+
+### Power draw
+
+TODO
 
 ## Verdict
 
