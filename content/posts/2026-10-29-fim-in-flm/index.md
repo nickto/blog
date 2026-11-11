@@ -1026,24 +1026,170 @@ in the [evaluation](#evaluation).
 
 ## Evaluation
 
-### SAFIM
+### Performance
 
-What is it and why I use it? 
+A single smoke-test prompt is not much of an evaluation, so we need a more
+rigorous test benchmark. Most popular code benchmarks, like HumanEval, give the
+model a function signature and a docstring and ask it to write the body. That is
+left-to-right generation, not what inline suggestions do.
 
-TODO
+[SAFIM](https://arxiv.org/abs/2403.04814) (Syntax-Aware Fill-in-the-Middle,
+Gong et al., 2024) is built specifically for FIM. It takes real code, cuts out
+a syntactically meaningful piece, and asks the model to fill it back in, given
+both the code before and after it. It has three subsets:
 
-### Results
+- **Algorithmic block** (8,781 tasks): a whole block, like the body of a loop
+  or an `if` branch, is missing.
+- **Control flow** (8,629 tasks): a control-flow expression is missing, like
+  the condition of an `if` or a `while`, or the header of a `for` loop.
+- **API call** (310 tasks): a call to a library function is missing, together
+  with its arguments.
+
+The tasks come in C++, Java, Python and C#, with C++ making up more than half
+of the block and control subsets.
+
+For the block and control subsets, the generated codes runs against unit tests.
+Pass means all tests pass. Otherwise, we get the reason why it failed: it did
+not compile, crashed, timed out, gave a wrong answer, and so on. The API tasks
+have no tests, so a completion passes if it matches the reference call (ignoring
+whitespace).
+
+Generation settings are the same for both runtimes and follow SAFIM's defaults:
+sampling with temperature 0.2 and top-p 0.95, up to 128 new tokens. Each task
+gets one sample (attempt), so the pass rate is denoted as "pass@1".
+
+#### Results
+
+##### Pass rate per variant
+
+Let's start with the big picture: the pass rate of each variant on each of the
+three SAFIM subsets.
+
+<details style="font-size: 0.8em; color: var(--secondary);">
+  <summary>A quick note on the intervals...</summary>
+
+  In the following plots, we use 95% HPD intervals. These are the credible
+  intervals where the posterior density is the highest, hence HPD, and they
+  contain 95% of the probability.
+  
+  For the pass rates I assume a beta-binomial model.
+  
+  And for the differences, since they are paired, we have 4 possible outcomes:
+  both model A and model B succeed, both fail, only model A succeeds, and only
+  model B succeeds. So we model them as a Dirichlet-multinomial distribution. And what we
+  are actually after is the difference between the probabilities of "only model
+  B succeeds" and "only model A succeeds", which equals the difference in pass
+  rates. The posterior of this difference has no closed form, so we sample from
+  the Dirichlet posterior and compute the difference for each draw.
+  
+  In both cases we use improper priors: Beta(0, 0) and Dirichlet(0, 0, 0, 0)
+  respectively.
+</details>
+<br/>
+ 
 ![SAFIM pass rate](safim_pass_rate_hpd.svg)
+
+We clearly see the separation into two groups:
+
+- The decent group, which includes the full-precision model, of course, and the
+  quantized models with AWQ (on both backends).
+- The bad group, which include all quantized models without AWQ (regardless of
+  the backend).
+
+##### Degradation compared to full-precision
+
+To see how much we lose compared to the full-precision model, we also
+plot the difference in pass rate of the variants and the F16 model.
 
 ![Each variant vs. full-precision](safim_diff_vs_f16.svg)
 
-![Effect of AWQ](safim_diff_awq.svg)
-![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
+Only the models from the decent group are at least comparable in performance
+to the full-precision variant. But even then, they are stil noticably worse:
+the 95% HPD does not contain 0, except for the API block, but it contains much 
+fewer samples, which inflates the variance.
+
+##### Effect of quantization
+
+Each variant differs from the others in a few ways at once, so let's isolate
+the effect of each change by comparing pairs that differ in just one thing.
+
 ![Effect of quantization](safim_diff_quantization.svg)
+
+Going from F16 to plain Q4_0 on llama.cpp costs about 35--40
+percentage points. Given the the full-precision model solves about 60--65% of
+tasks, this is a huge hit.
+
+##### Effect of runtime
+
 ![Effect of runtime](safim_diff_runtime.svg)
 
+With the same weights and the same quantization, FLM scores lower than
+llama.cpp. For plain Q4_0 the gap is large: about 16 percentage points on
+control, 9 on block and 18 on API. With AWQ it shrinks to about 4 percentage
+points on control and block and disappears on API. But API has fewer samples, so
+is more noisy.
+
+Part of the AWQ gap comes from FLM's defaults rather than from the runtime
+itself. FLM loads Qwen2-family models with a repetition penalty of 1.1, a
+frequency penalty of 1.1 and top-k of 10, and keeps them for any field the
+request leaves out. llama-server applies no penalties and uses top-k of 40. Our
+harness sent only temperature, top-p and seed, so the two backends were sampling
+differently.
+
+The rest is unexplained. The weights are identical (FLM's q4nx files hold the
+same Q4_0 nibbles as the GGUFs), and the prompts tokenize to the same tokens.
+For plain Q4_0, about 60% of samples differ already at the first generated
+token, where penalties play no role, and these carry most of the gap (12 of 16
+percentage points on control). So it seems likely that this is due to
+lower-precision arithmetic on the NPU, whose errors get amplified when the
+weights are already damaged by quantization. But this is just a plausible
+hypothesis.
+
+##### Effect of restoring embedding precision
+
+![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
+
+This is our first step to bring the performance
+closer to the full-precision variant. But it does not seem to help: the 0 is
+always within the 95% HPD range, except for the control block on the plain Q4_0
+variant, but it is actually even slightly worse. But the effect size is within a
+single percantage pooint. So restoring the embeddings' precision, seems to be
+harmless, but also not improve anything much either.
+
+##### Effect of AWQ
+
+![Effect of AWQ](safim_diff_awq.svg)
+
+This is the big one. On the same runtime, AWQ adds about 30 to 36
+percentage points on llama.cpp and 34 to 48 percentage points on FLM. The gain
+on FLM is likely to be large because we simply started closer to the bottom.
+
+##### Drilling down into test failure types
+
+Finally, it is worth looking at _how_ the variants fail, not only how often.
 
 ![SAFIM test outcomes](safim_outcomes.svg)
+
+The group of the decent variants mostly fail in a "normal" way: the answer is
+either correct or wrong. But the the bad group has the other failure modes much
+more common. Specifically, the code does not compile, or the variants simply
+return an empty answer. 
+
+Note that "empty" here means that nothing was left after SAFIM's
+post-processing. Digging into the raw outputs, the model rarely stopped right
+away: in 70–87% of these cases it did generate code, but nothing of it parsed as
+a valid block, so the post-processing cut it all away. The rest are mostly the
+model stopping immediately or producing only whitespace. This matches what we
+saw in the smoke tests: broken quantization does not produce slightly worse
+code, it produces garbage or nothing at all.
+
+To sum up:
+
+- Plain Q4_0 is not usable, on either runtime, and especially not on the NPU.
+- AWQ is what makes the NPU model usable: FLM Q4_0 AWQ is within a few
+  percentage points of the full-precision model.
+- Full-precision embeddings do not matter: they neither significanly improve
+  the performance, nor make it worse.
 
 ### Speed
 
