@@ -1193,22 +1193,71 @@ To sum up:
 
 ### Speed
 
-TODO
+The advantage of NPU is power efficiency, but besides the performance, 
+spees is another trade off. Sol let's put a numnber on it. 
 
-### Power draw
+FLM has no equivalent of llama-bench, we use a custom script that attempts to
+replicated llama-bench's metrics on FLM. 
 
-TODO
+<details style="font-size: 0.8em; color: var(--secondary);">
+  <summary>One small trick we had to use ...</summary>
 
-## Verdict
+  ... was retrying generations that stopped early. FLM does not allow ignoring
+  the EOS token, so some retries end early. Therefore, if the finishing reason
+  reported by FLM is not length, we retry with a different prompt.
 
-- Surprisingly good quality
-- A bit slow: latency on the GPU is better
-- The answer to the opening question: is it worth using instead of Copilot?
+  Another difference compared to llama-bench os that FLM does not allow passing
+  empty prompts, so we use a short, 16-token long, prompt before generating
+  output. 
+ 
+  FLM also always samples, while llama-bench does not, so the script set
+  temperature 0.2, top_p 0.95 and top_k 40, and turned off the repetition
+  penalties that FLM's defaults add.
 
+  Because of these reasons, the numbers are not exacly apples-to-apples, but
+  rather just give a good feeling of where the backends stand in terms of speed.
+</details>
+<br/>
 
-<!--Saving for reference-->
-<!--
-{{< collapse summary="Click collapse code block" openByDefault=false >}}
+First, the good news: all four FLM variants (Q4_0, Q4_0 with BF16 embeddings,
+and the same two with AWQ) run at the same speed. This is expected: they all use
+the same kernels and the same Q4_0 layout. AWQ only changes the values of the
+weights, and the embedding lookup happens outside the NPU matrix
+multiplications. Plain Q4_0 came out 1.5% faster on generation and 3--5% faster
+on prompt processing, but it was also the first one to run, so I attribute this
+to the hardware being cooler rather than to the weights. In other words,
+choosing the more accurate AWQ variant costs nothing in speed.
+
+Token generation is very stable: about 26 tokens per second, with the
+repetitions agreeing to within 0.1 t/s, and barely dependent on the length (26.2
+t/s for 16 tokens, 26.1 t/s for 128).
+
+Prompt processing is more interesting. Its speed grows with the prompt length:
+512 t/s for a 512-token prompt and 898 t/s for 2048 tokens. Fitting a line
+through the processing time against the prompt length explains why: each request
+pays a fixed cost of about 0.57 seconds, and then about 0.85 ms per token, or
+roughly 1,150--1,190 t/s. So the marginal speed is on par with llama.cpp on the
+GPU, but the fixed overhead dominates for short prompts. Keep in mind, though,
+that this fit is based on three prompt sizes only.
+
+Here is how it compares to llama.cpp running the same Q4_0 model on the iGPU:
+
+| Metric               | FLM (NPU) | llama.cpp ROCm | llama.cpp Vulkan |
+|----------------------|----------:|---------------:|-----------------:|
+| Generation (t/s)     |        26 |           35.6 |             41.5 |
+| Prompt, 512 (t/s)    |       512 |    1,260--1,410 |     1,260--1,410 |
+| Prompt, 2048 (t/s)   |       898 |    1,220--1,320 |     1,220--1,320 |
+
+FLM generates at 73% of the speed of ROCm and 63% of Vulkan. For a typical
+SAFIM-sized prompt of about 1,300 tokens and a 64-token completion, a
+back-of-the-envelope estimate based on these rates gives about 4 seconds for FLM
+versus 2.5--3 seconds for llama.cpp, i.e. FLM is about 1.5 times slower end to
+end. This is an estimate rather than a measurement, and it covers server-side
+time only, without HTTP and tokenization overhead.
+
+So on this machine, the NPU does not win on speed. The fixed per-request cost
+is especially unfortunate for inline completions, where the editor sends many
+short requests as you type.
 
 ```bash
 #!/usr/bin/env bash
