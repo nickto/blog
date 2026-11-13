@@ -1295,30 +1295,25 @@ does not ship a FIM-capable model, but Qwen2.5-Coder-3B has the same
 architecture as the officially supported Qwen2.5-3B-Instruct. So we can borrow
 the kernels of the latter and swap in the weights of the former.
 
-Getting there was a bit trickier than it sounds, though. None of the following
-gave an error, so each one had to be found by looking at the outputs (or the
-weights):
+Getting there was a bit trickier than it sounds, though. Along the way we had to
 
-- **The format.** The official model card says Q4_1, but the kernel expects
-  Q4_0. Feed it Q4_1, and it silently ignores the offsets and produces garbage.
-- **The stop tokens.** The Instruct model's config does not stop on the FIM
-  tokens, so they leak into the completions. Adding them to the EOS set fixes
-  that.
-  <!-- TODO: update if the expanded EOS set changes anything in the rerun. -->
-- **The quantization.** Plain Q4_0 runs, but the completions are mostly
-  unusable: about 35--40 percentage points below F16 on llama.cpp, and even
-  worse on FLM. AWQ, which is what the official model seems to use too, brings
-  most of it back.
+- **Change the quantization.** The official model card says Q4_1, but the
+  kernel expects Q4_0.
+- **Expand the EOS tokens.** The Instruct model's config does not stop on the
+  FIM tokens, so they leak into the completions. Adding them and a few others to
+  the EOS set fixes that.
+
+> TODO: update if the expanded EOS set changes anything in the rerun.
+
+- **Do activation aware quantization.** Plain Q4_0 runs, but the completions are
+  mostly unusable. AWQ, which is what the official model seems to use too,
+  brings most of it back.
 
 And one thing that did not matter: restoring the full-precision embeddings. It
-is free, so I keep it, but it does not change the pass rate in either
-direction.
+is free, so I'd keep it, but it does not change the quality in either direction.
 
-**Quality** turned out to be surprisingly good. The FLM AWQ variant is within a
-few percentage points of the full-precision model on llama.cpp. Given that
-I calibrated AWQ on the Pile, a general mix of text that is not particularly
-code-heavy, there is probably still some room for improvement with a
-code-specific calibration set.
+Quality turned out to be surprisingly good. The FLM AWQ variant is within a few
+percentage points of the full-precision model on llama.cpp 
 
 > **TODO:** update with the rerun using the fixed penalty parameters (and the
 > expanded EOS set). So far, it seems that the penalties help AWQ a bit, so the
@@ -1328,11 +1323,10 @@ code-specific calibration set.
 > "To sum up" list in [Summary](#summary).
 
 **Speed** is where the NPU loses. It generates at about 26 tokens per second,
-which is 63--73% of what llama.cpp does on the iGPU, and every request pays a
+which is about 70% of what llama.cpp does on the iGPU, and every request pays a
 fixed cost of about half a second before it even starts processing the prompt.
-End to end, a typical completion takes about 1.5 times longer than on the GPU.
-For inline suggestions, which fire constantly with relatively short prompts,
-this fixed cost is the most noticeable part.
+End-to-end, a typical completion takes about 1.5 times longer than on the GPU.
+For inline suggestions this is quite noticeable.
 
 **Power** was the whole reason to bother with the NPU in the first place.
 
@@ -1362,41 +1356,33 @@ This post is a "proof of pipeline", so there is plenty left to try.
 weights, and not the architecture, reuses the exact pipeline and kernel from
 this post:
 
-- _A better calibration set for AWQ._ The Pile is mostly not code. Calibrating
-  on code, ideally on FIM-formatted prompts, should protect the channels that
-  matter for this task specifically.
-- _Fine-tuning._ A FIM fine-tune of Qwen2.5-Coder-3B, or even one tuned on your
-  own repositories, changes the weights but not the shape, so the NPU kernel
-  stays the same. There is some evidence that FIM fine-tuning helps Qwen2.5-Coder
-  ([Gong et al., 2025](https://arxiv.org/abs/2505.18789)), although at 7B and
-  larger.
+- _A better calibration set for AWQ._ The Pile is mostly prose. Calibrating on
+  code, ideally on FIM-formatted prompts, might help preserving the
+  code-sensitive channels.
+- _Fine-tuning._ Changing weights without mangling with the architecture is possible.
+  And the point above suggests using a code-specific dataset for AWQ. Why not go
+  a step further and fine-tune on the FIM-specific dataset? Especially, becuase
+  rhere is some evidence that FIM fine-tuning can help Qwen2.5-Coder ([Gong et
+  al., 2025](https://arxiv.org/abs/2505.18789)).
 - _Existing community fine-tunes._ There are already a few FIM fine-tunes of
-  Coder-3B on Hugging Face, though without published benchmarks.
-
-One caveat worth knowing: unlike the other Coder sizes, which are Apache 2.0,
-[Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is released
-under the more restrictive `qwen-research` licence.
+  Coder-3B on Hugging Face, so we can skip the previous step and use those.
 
 **Other model sizes.** Qwen2.5-Coder also comes in 0.5B, 1.5B, 7B, 14B and 32B.
 A smaller model would help with the speed, which is the NPU's weak spot here,
-and a larger one with the quality. Unfortunately, the trick in this post works
-only if FLM ships a kernel of exactly the same shape (number of layers, hidden
-size, attention heads), and for Qwen2.5 it ships only one text model: the 3B.
-So within Qwen2.5, we are stuck at 3B, and so are the fine-tunes of the other
-Coder sizes, like [Sweep
+and a larger one with the quality. The problem is that the appraoch described
+here requires the exact same architecture, and FLM ships Qwen2.5 only ine one
+size: 3B. So within Qwen2.5, we are stuck at 3B, and so are the fine-tunes of
+the other Coder sizes, like [Sweep
 Next-Edit](https://huggingface.co/sweepai/sweep-next-edit-1.5B) (1.5B) or Zed's
 [Zeta](https://huggingface.co/zed-industries/zeta) (7B).
 
-**Other model families.** FLM has a wider choice in newer families. For
-example, it ships Qwen3 at 0.6B, 1.7B, 4B and 8B, Llama 3.2 at 1B and 3B, and
-Gemma 3 at 1B and 4B. None of these are FIM models out of the box, but any FIM
-model that shares the shape of one of them is a candidate for the same trick.
-One potential lead is TIGER-Lab's FIM model built on Qwen3-8B.
+**Other model families.** FLM has a wider choice in newer families. For example,
+it ships Qwen3 at 0.6B, 1.7B, 4B and 8B, Llama 3.2 at 1B and 3B, and Gemma 3 at
+1B and 4B. None of these are FIM models out of the box, but any FIM model that
+shares the shape of one of them is a candidate for the same trick. One potential
+lead is [TIGER-Lab's
+FIM](https://huggingface.co/collections/TIGER-Lab/fim-midtraining) model built
+on Qwen3-8B.
 
 To be clear, these are ideas rather than a plan, and I have not tried any of
-them yet. Some of them may not work out for one reason or another: a
-fine-tune may turn out to differ from the base model in some detail that
-the kernel cares about, the licence may not allow it, FLM's kernel may make
-assumptions about the model that are not visible from the outside (like with
-Q4_1), or the resulting model may simply not be good enough for inline
-suggestions.
+them yet. But it would intereseting to go ahead and explore them, wouldn't it?
