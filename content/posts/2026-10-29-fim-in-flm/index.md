@@ -39,63 +39,7 @@ Given the aspects which I will discuss in the NPU section, I will just mention
 that [Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is one of
 these models.
 
-## GPU
-
-Running on GPU, regardless of whether it is discrete or integrated, is
-straightforward: just find a suitable model and serve with
-[llama.cpp](https://github.com/ggml-org/llama.cpp) using the backend that your
-GPU supports.
-
-### Vulkan vs ROCm
-
-I have an integrated Radeon 890M, which supports both Vulkan and ROCm on Linux, 
-so I have to pick.
-
-**Vulkan** is a cross-vendor, low-level graphics API that also supports compute
-shaders. llama.cpp's Vulkan backend expresses the same operations as generic
-shaders, which the driver then compiles for whatever GPU is there.
-
-**ROCm** is AMD's GPU compute platform, an answer to NVIDIA's CUDA. Its main
-programming model is HIP, which looks like CUDA and compiles to code written
-specifically for AMD GPU architectures. llama.cpp has a dedicated HIP backend
-for it.
-
-Vulkan only needs the regular graphics driver, so it is much easier to set up,
-and because it is cross-vendor, it has larger adoption and is more stable. ROCm
-is vendor-tuned and targets the hardware directly, so one can expect that
-matrix-multiplication should be faster on ROCm. On the flip side, support for
-integrated GPUs is often unofficial, and therefore the whole setup can be less
-stable and require some fiddling to make it work. For example, the 890M needs
-`HSA_OVERRIDE_GFX_VERSION=11.0.0` to make ROCm treat it as an RDNA 3 GPU
-(gfx1100) instead of its actual RDNA 3.5 architecture (gfx1150), for which ROCm
-has no kernels.
-
-Luckily, llama.cpp has a built-in utility for measuring model throughput, which
-I used to benchmark performance:
-
-- across the two backends,
-- for two quantization levels,
-- across input and output sizes realistic for FIM tasks.
-
-![Prompt processing throughput.](bench_prompt.svg)
-
-![Token generation throughput.](bench_generation.svg)
-
-The main takeaway here is that for inline completions, which typically have long
-prompts and short completions, it's prompt processing that is the bottleneck,
-and ROCm is noticeably faster for the F16 variant, while Vulkan is faster for Q4_0.
-
-Treat these conclusions with a grain of salt, though. I noticed that the same
-parameters can yield wildly different results within the different retries of
-the same experiment run. The likely culprit is thermal throttling: giving the
-GPU time to cool down between runs seemed to help, and the results become much
-more stable. However, I have not tested this hypothesis directly, so I cannot
-guarantee that the results shown here are not affected by it, rather than being
-stable because they are equally affected.
-
-### Example query and completion
-
-As a quick test of whether it works, I check how models complete the following code:
+### The prompt format
 
 ```python
 def add(a, b):
@@ -122,6 +66,41 @@ this
   "prompt": "<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
 }
 ```
+
+## Baseline: llama.cpp on the GPU
+
+Running on GPU, regardless of whether it is discrete or integrated, is
+straightforward: just find a suitable model and serve with
+[llama.cpp](https://github.com/ggml-org/llama.cpp) using the backend that your
+GPU supports.
+
+### Vulkan or ROCm
+
+I have an integrated Radeon 890M, which supports both Vulkan and ROCm on Linux, 
+so I have to pick.
+
+**Vulkan** is a cross-vendor, low-level graphics API that also supports compute
+shaders. llama.cpp's Vulkan backend expresses the same operations as generic
+shaders, which the driver then compiles for whatever GPU is there.
+
+**ROCm** is AMD's GPU compute platform, an answer to NVIDIA's CUDA. Its main
+programming model is HIP, which looks like CUDA and compiles to code written
+specifically for AMD GPU architectures. llama.cpp has a dedicated HIP backend
+for it.
+
+Vulkan only needs the regular graphics driver, so it is much easier to set up,
+and because it is cross-vendor, it has larger adoption and is more stable. ROCm
+is vendor-tuned and targets the hardware directly, so one can expect that
+matrix-multiplication should be faster on ROCm. On the flip side, support for
+integrated GPUs is often unofficial, and therefore the whole setup can be less
+stable and require some fiddling to make it work. For example, the 890M needs
+`HSA_OVERRIDE_GFX_VERSION=11.0.0` to make ROCm treat it as an RDNA 3 GPU
+(gfx1100) instead of its actual RDNA 3.5 architecture (gfx1150), for which ROCm
+has no kernels.
+
+### Smoke test
+
+As a quick test of whether it works, I check how models complete the following code:
 
 and full `curl` command for the F16 Qwen 2.5 Coder 3B model, looks like this
 (assuming that llama.cpp is running on `localhost:8080`):
@@ -172,15 +151,13 @@ def div(a, b):
 We can discuss whether this is exactly what we wanted or not, but at least it is
 hard to argue that this is not a perfectly valid completion.
 
-## NPU
+## Why an NPU
 
 Another option is to run on an NPU, e.g., I have an AMD Ryzen AI 9 HX 370, which
 has one built in. An NPU (neural processing unit) is an accelerator that is
 basically built for efficient matrix multiplication. And neural networks mostly
 consist of matrix multiplications, so it is very suitable for running them.
 Unlike a GPU, its goal is energy efficiency rather than peak speed.
-
-### NPU vs GPU
 
 A GPU is very flexible: it decides how to schedule the work while it is running,
 so it can handle almost any parallel computation. An NPU saves power by having
@@ -191,8 +168,6 @@ The practical consequence of that is that you cannot just run any model on it,
 like on a GPU. Each model has to be specifically prepared for the hardware so
 the choice of the models that can run on it is very limited.
 
-### Why bother?
-
 If running models on NPU is hard, why use it at all? Well, the inline
 suggestions are a background task: they fire constantly while you type. So
 running them on a GPU is hard to miss: its load sits close to 100% almost all of
@@ -201,7 +176,7 @@ hand warmer, which is nice. But it drains the battery, which is not nice. And
 because NPUs are supposed to be much more energy efficient than GPUs, running
 models for such background tasks on NPU sounds very appealing.
 
-### FastFlowLM
+## FastFlowLM
 
 Luckily, there is a great project, called [FastFlowLM](https://fastflowlm.com/)
 (FLM). It is a runtime for the Ryzen AI NPU. You install it, run something like
@@ -215,7 +190,7 @@ AMD](https://www.amd.com/en/blogs/2026/fastflowlm-joins-amd-to-advance-ai-infere
 and the code now lives in [AMD's ROCm
 organization](https://github.com/ROCm/FastFlowLM).
 
-#### The good
+### Models and the completions endpoint
 
 FLM offers a pretty [wide choice of smaller
 LLMs](https://fastflowlm.com/docs/models/) (and a couple of other neural
@@ -258,7 +233,7 @@ the model itself was trained for FIM. Technically, one could maybe find a
 workaround, but the existing tools expect the `/v1/completions` endpoint (or an even
 less commonly supported `/v1/fim/completions`).
 
-#### The bad
+### Closed kernels, no FIM model
 
 But there is one important caveat: FLM is only partly open source. The
 orchestration code and the CLI are
@@ -272,7 +247,9 @@ much you can do. At least without jumping through a lot of hoops.
 Unfortunately, even though FLM offers quite a few models, none of them are
 FIM capable. So we cannot use an off-the-shelf solution here.
 
-## Converting model for NPU
+## Getting the Coder onto the NPU
+
+### Borrowing the kernels
 
 One way of jumping through the hoops is to reuse the kernels of a model that is
 already supported, and only replace the weights. However, this is possible only
@@ -286,7 +263,7 @@ is officially supported and has the same architecture as Qwen2.5-Coder-3B, we
 can reuse its kernels and convert the Coder weights to Q4NX, the format FLM's
 models use.
 
-### GGUF to Q4NX: the naive approach
+### The naive conversion
 
 [FLM Q4NX Converter](https://github.com/ROCm/FLM_Q4NX_Converter) expects a Q4_0
 or Q4_1 quantized weights in GGUF format. And the [model's
@@ -326,14 +303,14 @@ Unlike the example we had before, where we might argue whether we wanted
 a completion of just one function, or a whole battery of them, here we have
 a clear case of garbage.
 
-### Q4_1 in, garbage out
-
 First, I thought that this was an issue with the tokenizer or the model
 configs. So I tried mixing and matching them, taking some files from the Hugging
 Face checkpoint and some from the official NPU2 release. No luck.
 
 Then, before giving up, I asked an LLM what might be wrong (should have done
 that first, haha).
+
+### Q4_0 and Q4_1
 
 To make sense of its answer, we need to know the difference between Q4_0 and
 Q4_1 quantization. Both are 4-bit quantization formats: weights are split into
@@ -355,6 +332,8 @@ The extra parameter makes Q4_1 a bit more precise: on a few sampled tensors, the
 relative error of the dequantized weights against the original ones was about
 10% lower for Q4_1 than for Q4_0, for about 11% more size. So if the kernel
 supports it, there is little reason not to use it.
+
+### The card says Q4_1, the weights say Q4_0
 
 Instead of guessing further, the LLM went straight to the weights. It wrote a
 small decoder for the Q4NX file, and compared the official Qwen2.5-3B-Instruct
@@ -392,6 +371,24 @@ smallest weight to its largest. A Q4_0 scale can carry a sign.
 In other words, the official model does not look like Q4_1 at all. It looks
 like Q4_0.
 
+But the model card still said Q4_1. Was the card wrong, or was it just a
+coincidence? So we (me and my LLM detective) collected more evidence:
+
+- In FLM's own model registry (`model_list.json`), `qwen2.5-it:3b` is listed as
+  `Q4_0`. The same file lists `Q4_1` for other models (e.g., `qwen3` and
+  `llama3.2`), so it does distinguish between the two.
+- The converter's Qwen2 config has `Q4_0` as the default tensor type.
+
+So the model card is the odd one out. I do not know why it says Q4_1.
+
+What makes this trap particularly nasty is that there are no errors along the
+whole pipeline. The converter accepts Q4_1 without a warning and writes a file
+of exactly the same size as the Q4_0 one. FLM loads it just fine. It only breaks
+inside the closed kernel, which seems to simply ignore the offset: zeroing all
+the offsets in my Q4_1 file gave the same garbage, token for token. And the
+offset is not a small correction you can afford to lose. It is about 40% of the
+weights' magnitude!
+
 So I converted from Q4_0 instead, and the model started producing code! 🥳
 
 ```bash
@@ -420,25 +417,7 @@ returns
 Still not perfect (and we will get into this), but it looks like a step in the
 right direction!
 
-But the model card still said Q4_1. Was the card wrong, or was it just a
-coincidence? So we (me and my LLM detective) collected more evidence:
-
-- In FLM's own model registry (`model_list.json`), `qwen2.5-it:3b` is listed as
-  `Q4_0`. The same file lists `Q4_1` for other models (e.g., `qwen3` and
-  `llama3.2`), so it does distinguish between the two.
-- The converter's Qwen2 config has `Q4_0` as the default tensor type.
-
-So the model card is the odd one out. I do not know why it says Q4_1.
-
-What makes this trap particularly nasty is that there are no errors along the
-whole pipeline. The converter accepts Q4_1 without a warning and writes a file
-of exactly the same size as the Q4_0 one. FLM loads it just fine. It only breaks
-inside the closed kernel, which seems to simply ignore the offset: zeroing all
-the offsets in my Q4_1 file gave the same garbage, token for token. And the
-offset is not a small correction you can afford to lose. It is about 40% of the
-weights' magnitude!
-
-## Improving the quality
+## Fixing the completions
 
 So we got something that resembles the actual code, using the model converted
 for FLM. However, there are two conspicuous issues. 
@@ -461,7 +440,7 @@ def add(a, b):
 It got the indentation wrong, and even if we ignore the extra space, the
 function will not work.
 
-### Dealing with special tokens
+### Stop tokens
 
 There are five special tokens in the Qwen2.5-Coder tokenizer that matter for
 FIM:
@@ -530,7 +509,7 @@ curl -s http://localhost:52625/v1/completions \
 
 It stops the special tokens from leaking.
 
-### Restoring precise embeddings
+### Full-precision embeddings
 
 Fixing the stop tokens doesn't help with the second issue: the code itself is
 still wrong. Given that the original F16 output on llama.cpp is fine, the
@@ -607,9 +586,9 @@ wanted. So on its own, this tweak does not fully fix the bad completions. It is
 still worth keeping, though, because there is little downside and it does not
 conflict with the fix proposed in the next section. But whether the
 full-precision embeddings add anything on top of it, we will see in the
-[evaluation](#evaluation).
+[evaluation](#quality).
 
-### Smarter quantization
+### The official model is not plain Q4_0
 
 With the special tokens and the embeddings sorted out, the completions were
 still bad. And not only on our smoke-test prompt: on a larger (but still
@@ -624,8 +603,6 @@ Since llama.cpp suffered from the same flaws, the problem had to be in the model
 file itself, so the quantization was the main suspect. But FLM's official
 Qwen2.5-3B-Instruct is also Q4_0, and it works fine. 
 
-{{< collapse summary="So what does the official model do differently?" openByDefault=false >}}
-
 FLM does not ship an official Coder model to compare against. So I ran my
 pipeline on Qwen2.5-3B-Instruct instead and compared the result with the
 official Q4NX file. The idea was to double-check my conversion: is my pipeline
@@ -635,14 +612,14 @@ additional fine-tuning or other optimisation. But the weights were different.
 Only about a quarter of the tensors (109 of 435: the embedding, the final norm,
 and almost all of the biases) were bit-identical. 
 
-{{< /collapse >}}
-
 So, it turns out that the weight matrices differed and they did so in a very particular way.
+
+## How AWQ works
 
 To explain how, we need to talk about [AWQ: Activation-aware Weight
 Quantization](https://arxiv.org/abs/2306.00978) (Lin, J., et al., 2023). 
 
-#### Scrutinizing Q4_0 errors
+### Where the Q4_0 error comes from
 
 In order to understand it, let's recap how Q4_0 works, and where the rounding
 errors come from. 
@@ -719,7 +696,7 @@ Notice how the activation `$x_1$` contributes to the output only via column 1 of
 the matrix $W$. So each channel has its own column of weights, and whatever
 happens to channel $i$---both `$x_i$` and its column---affects every output. Also notice the contrary: each output is a sum with one term from every channel.
 
-#### Not all channels are born equal
+### Not all channels are born equal
 
 Quantization groups run along the rows, so each weight in a group belongs to a
 different channel. And not all channels are equally important
@@ -744,7 +721,7 @@ scaling and clipping: the former improves precision by focusing on channels with
 large activations, and the latter gives up precision in low activation channels
 in order to improve it in the rest.
 
-#### Scaling: make activations smaller
+### Scaling
 
 If the activation is large, the contribution of this channel to the output error
 is also large (channel 2 in our example). So AWQ shrinks large activations,
@@ -837,7 +814,7 @@ whether the folding is possible at all.
 
 {{< /collapse >}}
 
-#### Clipping: do not let outliers set the range
+### Clipping
 
 Scaling tackled the activations in our error bound:
 `$$
@@ -903,7 +880,13 @@ quantization.
 
 We can then quantize it with plain Q4_0, as before. Since `llama-quantize` picks
 the step from the largest weight in each group, it automatically picks up the
-clipped values. And this is exactly the fingerprint my LLM detective found in
+clipped values.
+
+## Replicating the official model
+
+### The AWQ fingerprint
+
+And this is exactly the fingerprint my LLM detective found in
 the official model:
 
 - Some weight columns are multiplied by a scale $s$, and the layers right
@@ -918,11 +901,11 @@ the official model:
   no clipping at all. The unclipped layers are the ones AutoAWQ deliberately
   leaves alone, because errors there distort attention.
 
-### Replicating the official
-
 So the likely recipe to get the performance similar to the officially
 distributed models is AWQ → GGUF → Q4_0 → Q4NX. So far, we have already done all
 the steps except for AWQ. And applying it is straightforward, if using AutoAWQ.
+
+### Running AutoAWQ
 
 AWQ's search needs to simulate rounding to measure the error, and by default
 AutoAWQ simulates something other than Q4_0. To get as close to Q4_0 as AutoAWQ
@@ -958,6 +941,8 @@ In practice, there were a couple of gotchas when running on CPU:
   developing, mistakes are the norm, and every mistake gets expensive. After a
   few failures, I lost patience and moved the AutoAWQ step to a GPU instance in
   the cloud.
+
+### Smoke test
 
 Time for our smoke test again:
 
@@ -1022,11 +1007,11 @@ def add(a, b):
 Exactly what we wanted, give or take an empty line! Of course, this is a single
 prompt, and the single prompt might be not representative. How much AWQ helps,
 and whether the full-precision embeddings add anything on top of it, we will see
-in the [evaluation](#evaluation).
+in the [evaluation](#quality).
 
-## Evaluation
+## Quality
 
-### Performance
+### The benchmark: SAFIM
 
 A single smoke-test prompt is not much of an evaluation, so we need a more
 rigorous test benchmark. Most popular code benchmarks, like HumanEval, give the
@@ -1058,9 +1043,7 @@ Generation settings are the same for both runtimes and follow SAFIM's defaults:
 sampling with temperature 0.2 and top-p 0.95, up to 128 new tokens. Each task
 gets one sample (attempt), so the pass rate is denoted as "pass@1".
 
-#### Results
-
-##### Pass rate per variant
+### Pass rate per variant
 
 Let's start with the big picture: the pass rate of each variant on each of the
 three SAFIM subsets.
@@ -1096,7 +1079,7 @@ We clearly see the separation into two groups:
 - The bad group, which include all quantized models without AWQ (regardless of
   the backend).
 
-##### Degradation compared to full-precision
+### Degradation compared to full precision
 
 To see how much we lose compared to the full-precision model, we also
 plot the difference in pass rate of the variants and the F16 model.
@@ -1108,10 +1091,12 @@ to the full-precision variant. But even then, they are stil noticably worse:
 the 95% HPD does not contain 0, except for the API block, but it contains much 
 fewer samples, which inflates the variance.
 
-##### Effect of quantization
+### Effect of each change
 
 Each variant differs from the others in a few ways at once, so let's isolate
 the effect of each change by comparing pairs that differ in just one thing.
+
+#### Quantization
 
 ![Effect of quantization](safim_diff_quantization.svg)
 
@@ -1119,7 +1104,26 @@ Going from F16 to plain Q4_0 on llama.cpp costs about 35--40
 percentage points. Given the the full-precision model solves about 60--65% of
 tasks, this is a huge hit.
 
-##### Effect of runtime
+#### Embeddings
+
+![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
+
+This is our first step to bring the performance
+closer to the full-precision variant. But it does not seem to help: the 0 is
+always within the 95% HPD range, except for the control block on the plain Q4_0
+variant, but it is actually even slightly worse. But the effect size is within a
+single percantage pooint. So restoring the embeddings' precision, seems to be
+harmless, but also not improve anything much either.
+
+#### AWQ
+
+![Effect of AWQ](safim_diff_awq.svg)
+
+This is the big one. On the same runtime, AWQ adds about 30 to 36
+percentage points on llama.cpp and 34 to 48 percentage points on FLM. The gain
+on FLM is likely to be large because we simply started closer to the bottom.
+
+#### Runtime
 
 ![Effect of runtime](safim_diff_runtime.svg)
 
@@ -1145,26 +1149,7 @@ lower-precision arithmetic on the NPU, whose errors get amplified when the
 weights are already damaged by quantization. But this is just a plausible
 hypothesis.
 
-##### Effect of restoring embedding precision
-
-![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
-
-This is our first step to bring the performance
-closer to the full-precision variant. But it does not seem to help: the 0 is
-always within the 95% HPD range, except for the control block on the plain Q4_0
-variant, but it is actually even slightly worse. But the effect size is within a
-single percantage pooint. So restoring the embeddings' precision, seems to be
-harmless, but also not improve anything much either.
-
-##### Effect of AWQ
-
-![Effect of AWQ](safim_diff_awq.svg)
-
-This is the big one. On the same runtime, AWQ adds about 30 to 36
-percentage points on llama.cpp and 34 to 48 percentage points on FLM. The gain
-on FLM is likely to be large because we simply started closer to the bottom.
-
-##### Drilling down into test failure types
+### How the variants fail
 
 Finally, it is worth looking at _how_ the variants fail, not only how often.
 
@@ -1183,6 +1168,8 @@ model stopping immediately or producing only whitespace. This matches what we
 saw in the smoke tests: broken quantization does not produce slightly worse
 code, it produces garbage or nothing at all.
 
+### Summary
+
 To sum up:
 
 - Plain Q4_0 is not usable, on either runtime, and especially not on the NPU.
@@ -1191,10 +1178,37 @@ To sum up:
 - Full-precision embeddings do not matter: they neither significanly improve
   the performance, nor make it worse.
 
-### Speed
+## Speed
 
 The advantage of NPU is power efficiency, but besides the performance, 
 spees is another trade off. Sol let's put a numnber on it. 
+
+### llama.cpp on the GPU
+
+Luckily, llama.cpp has a built-in utility for measuring model throughput, which
+I used to benchmark performance:
+
+- across the two backends,
+- for two quantization levels,
+- across input and output sizes realistic for FIM tasks.
+
+![Prompt processing throughput.](bench_prompt.svg)
+
+![Token generation throughput.](bench_generation.svg)
+
+The main takeaway here is that for inline completions, which typically have long
+prompts and short completions, it's prompt processing that is the bottleneck,
+and ROCm is noticeably faster for the F16 variant, while Vulkan is faster for Q4_0.
+
+Treat these conclusions with a grain of salt, though. I noticed that the same
+parameters can yield wildly different results within the different retries of
+the same experiment run. The likely culprit is thermal throttling: giving the
+GPU time to cool down between runs seemed to help, and the results become much
+more stable. However, I have not tested this hypothesis directly, so I cannot
+guarantee that the results shown here are not affected by it, rather than being
+stable because they are equally affected.
+
+### FLM on the NPU
 
 FLM has no equivalent of llama-bench, we use a custom script that attempts to
 replicated llama-bench's metrics on FLM. 
@@ -1298,9 +1312,9 @@ code-specific calibration set.
 > **TODO:** update with the rerun using the fixed penalty parameters (and the
 > expanded EOS set). So far, it seems that the penalties help AWQ a bit, so the
 > FLM vs. llama.cpp gap for AWQ should shrink (and part of it should move from
-> "unexplained" to "FLM's defaults" in [Effect of runtime](#effect-of-runtime)),
+> "unexplained" to "FLM's defaults" in [Runtime](#runtime)),
 > while plain Q4_0 stays about the same. Update the numbers here and in the
-> "To sum up" list in [Results](#results).
+> "To sum up" list in [Summary](#summary).
 
 **Speed** is where the NPU loses. It generates at about 26 tokens per second,
 which is 63--73% of what llama.cpp does on the iGPU, and every request pays a
