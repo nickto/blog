@@ -35,11 +35,14 @@ However, not all models understand it because in order to do so, the model
 should have been trained on this format. So we need to narrow down the list of
 models to the ones that were.
 
-Given the aspects which I will discuss in the NPU section, I will just mention
-that [Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is one of
-these models.
+[Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is one of
+these models, and it is the one I use throughout this post. Why this one in
+particular will become clear in the [FastFlowLM](#fastflowlm) section.
 
 ### The prompt format
+
+Let's take a simple example: we want the model to fill in the line where the
+comment is.
 
 ```python
 def add(a, b):
@@ -98,12 +101,15 @@ stable and require some fiddling to make it work. For example, the 890M needs
 (gfx1100) instead of its actual RDNA 3.5 architecture (gfx1150), for which ROCm
 has no kernels.
 
+Which of the two is faster for our use case, we will see in the
+[Speed](#speed) section.
+
 ### Smoke test
 
-As a quick test of whether it works, I check how models complete the following code:
-
-and full `curl` command for the F16 Qwen 2.5 Coder 3B model, looks like this
-(assuming that llama.cpp is running on `localhost:8080`):
+As a quick test of whether it works, let's send the `add` example from
+[above](#the-prompt-format) to the F16 Qwen2.5-Coder-3B model. Assuming that
+llama.cpp is running on `localhost:8080`, the full `curl` command looks like
+this:
 
 ```bash
 curl -s http://localhost:8080/v1/completions \
@@ -312,8 +318,8 @@ that first, haha).
 
 ### Q4_0 and Q4_1
 
-To make sense of its answer, we need to know the difference between Q4_0 and
-Q4_1 quantization. Both are 4-bit quantization formats: weights are split into
+To make sense of what it found, we first need to know the difference between
+Q4_0 and Q4_1 quantization. Both are 4-bit quantization formats: weights are split into
 smaller groups, and each weight is stored as a 4-bit integer `q`, which takes a
 _nibble_ (half a byte), plus a scale shared by the whole group. What differs is
 how a group is turned back into numbers:
@@ -371,8 +377,8 @@ smallest weight to its largest. A Q4_0 scale can carry a sign.
 In other words, the official model does not look like Q4_1 at all. It looks
 like Q4_0.
 
-But the model card still said Q4_1. Was the card wrong, or was it just a
-coincidence? So we (me and my LLM detective) collected more evidence:
+But the model card says Q4_1. Was the card wrong, or were we misreading the
+weights? So we (me and my LLM detective) collected more evidence:
 
 - In FLM's own model registry (`model_list.json`), `qwen2.5-it:3b` is listed as
   `Q4_0`. The same file lists `Q4_1` for other models (e.g., `qwen3` and
@@ -389,7 +395,8 @@ the offsets in my Q4_1 file gave the same garbage, token for token. And the
 offset is not a small correction you can afford to lose. It is about 40% of the
 weights' magnitude!
 
-So I converted from Q4_0 instead, and the model started producing code! 🥳
+So I converted the Coder from Q4_0 instead, and the model started producing
+code! 🥳
 
 ```bash
 curl -s http://localhost:52625/v1/completions \
@@ -584,7 +591,7 @@ This code would actually work! The second return statement might attract a
 linter complaint at most. But it is still not great: clearly not what we
 wanted. So on its own, this tweak does not fully fix the bad completions. It is
 still worth keeping, though, because there is little downside and it does not
-conflict with the fix proposed in the next section. But whether the
+conflict with the fix we will get to later. But whether the
 full-precision embeddings add anything on top of it, we will see in the
 [evaluation](#quality).
 
@@ -607,16 +614,19 @@ FLM does not ship an official Coder model to compare against. So I ran my
 pipeline on Qwen2.5-3B-Instruct instead and compared the result with the
 official Q4NX file. The idea was to double-check my conversion: is my pipeline
 producing the same quantized weights given the same full-precision input? I
-expected them to be bit-dentical: after all, FLM does not openly claim to do any
+expected them to be bit-identical: after all, FLM does not openly claim to do any
 additional fine-tuning or other optimisation. But the weights were different.
 Only about a quarter of the tensors (109 of 435: the embedding, the final norm,
 and almost all of the biases) were bit-identical. 
 
-So, it turns out that the weight matrices differed and they did so in a very particular way.
+So, it turns out that the weight matrices differed, and they did so in a very
+particular way: the way AWQ changes them. The next section explains how AWQ
+works. If you already know it, or only want the recipe, skip ahead to
+[Replicating the official model](#replicating-the-official-model).
 
 ## How AWQ works
 
-To explain how, we need to talk about [AWQ: Activation-aware Weight
+AWQ stands for [Activation-aware Weight
 Quantization](https://arxiv.org/abs/2306.00978) (Lin, J., et al., 2023). 
 
 ### Where the Q4_0 error comes from
@@ -800,7 +810,7 @@ the layer, and keeps the set whose $h$ is closest to the original.
 
 This does not work in _every_ neural network, but it does in most LLMs.
 For instance, in our toy example this wouldn't work, because we feed the 
-ouput of non-linearity, $\sigma(Wx)$, directly as activation into the next layer.
+output of non-linearity, $\sigma(Wx)$, directly as activation into the next layer.
 
 But in most transformers, the attention and MLP blocks start with some kind  
 of layer normalization. In Qwen2.5's case, for example, it's RMSNorm, which  
@@ -868,26 +878,27 @@ important channels, and clipping prevents the unimportant ones from driving $d$.
 
 Compared to scaling, there is one important aspect that we should be aware
 though. Scaling does not change what the layer computes, while clipping does:
-there is no analogue of the invers scale for clipping. But given that we are
-already heavily quantizing the model, the weights are goind to suffer anyway.
-Clipping just helps controls where the error goes.
+there is no analogue of the inverse scale for clipping. But given that we are
+already heavily quantizing the model, the weights are going to suffer anyway.
+Clipping just helps control where the error goes.
 
-Importantly, all of this happens in full prevision _before_ quantization. The
-result is a normal checkpoint with the exact same architecture, computes almost
+Importantly, all of this happens in full precision _before_ quantization. The
+result is a normal checkpoint with the exact same architecture that computes almost
 the same values (only clipping changes it a bit). It's just that these
-tranfsormations help decreasing the rounding errors in the subsequent 4-bit
+transformations help decrease the rounding errors in the subsequent 4-bit
 quantization. 
 
 We can then quantize it with plain Q4_0, as before. Since `llama-quantize` picks
 the step from the largest weight in each group, it automatically picks up the
-clipped values.
+clipped values. As far as the kernel is concerned, the result is still plain
+Q4_0, just with weights that survive the rounding better.
 
 ## Replicating the official model
 
 ### The AWQ fingerprint
 
-And this is exactly the fingerprint my LLM detective found in
-the official model:
+Both scaling and clipping leave traces in the weights. And this is exactly the
+fingerprint my LLM detective found in the official model:
 
 - Some weight columns are multiplied by a scale $s$, and the layers right
   before them are adjusted to divide the matching activations by the same $s$,
@@ -970,7 +981,7 @@ It returns:
 ```
 
 This is, word for word, the beginning of what the F16 model gave us in
-llama.cpp at the very start of this post. The model wants to write a whole
+llama.cpp in the [GPU smoke test](#smoke-test). The model wants to write a whole
 battery of functions again, and the implied code is:
 
 ```python
@@ -1033,7 +1044,7 @@ both the code before and after it. It has three subsets:
 The tasks come in C++, Java, Python and C#, with C++ making up more than half
 of the block and control subsets.
 
-For the block and control subsets, the generated codes runs against unit tests.
+For the block and control subsets, the generated code runs against unit tests.
 Pass means all tests pass. Otherwise, we get the reason why it failed: it did
 not compile, crashed, timed out, gave a wrong answer, and so on. The API tasks
 have no tests, so a completion passes if it matches the reference call (ignoring
@@ -1076,7 +1087,7 @@ We clearly see the separation into two groups:
 
 - The decent group, which includes the full-precision model, of course, and the
   quantized models with AWQ (on both backends).
-- The bad group, which include all quantized models without AWQ (regardless of
+- The bad group, which includes all quantized models without AWQ (regardless of
   the backend).
 
 ### Degradation compared to full precision
@@ -1087,7 +1098,7 @@ plot the difference in pass rate of the variants and the F16 model.
 ![Each variant vs. full-precision](safim_diff_vs_f16.svg)
 
 Only the models from the decent group are at least comparable in performance
-to the full-precision variant. But even then, they are stil noticably worse:
+to the full-precision variant. But even then, they are still noticeably worse:
 the 95% HPD does not contain 0, except for the API block, but it contains much 
 fewer samples, which inflates the variance.
 
@@ -1101,19 +1112,8 @@ the effect of each change by comparing pairs that differ in just one thing.
 ![Effect of quantization](safim_diff_quantization.svg)
 
 Going from F16 to plain Q4_0 on llama.cpp costs about 35--40
-percentage points. Given the the full-precision model solves about 60--65% of
+percentage points. Given that the full-precision model solves about 60--65% of
 tasks, this is a huge hit.
-
-#### Embeddings
-
-![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
-
-This is our first step to bring the performance
-closer to the full-precision variant. But it does not seem to help: the 0 is
-always within the 95% HPD range, except for the control block on the plain Q4_0
-variant, but it is actually even slightly worse. But the effect size is within a
-single percantage pooint. So restoring the embeddings' precision, seems to be
-harmless, but also not improve anything much either.
 
 #### AWQ
 
@@ -1122,6 +1122,17 @@ harmless, but also not improve anything much either.
 This is the big one. On the same runtime, AWQ adds about 30 to 36
 percentage points on llama.cpp and 34 to 48 percentage points on FLM. The gain
 on FLM is likely to be large because we simply started closer to the bottom.
+
+#### Embeddings
+
+![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
+
+Restoring the full-precision embeddings was the first fix we tried to bring the
+performance closer to the full-precision variant. But it does not seem to help: the 0 is
+always within the 95% HPD range, except for the control block on the plain Q4_0
+variant, but it is actually even slightly worse. But the effect size is within a
+single percentage point. So restoring the embeddings' precision seems to be
+harmless, but it does not improve anything much either.
 
 #### Runtime
 
@@ -1156,7 +1167,7 @@ Finally, it is worth looking at _how_ the variants fail, not only how often.
 ![SAFIM test outcomes](safim_outcomes.svg)
 
 The group of the decent variants mostly fail in a "normal" way: the answer is
-either correct or wrong. But the the bad group has the other failure modes much
+either correct or wrong. But in the bad group, the other failure modes are much
 more common. Specifically, the code does not compile, or the variants simply
 return an empty answer. 
 
@@ -1175,20 +1186,20 @@ To sum up:
 - Plain Q4_0 is not usable, on either runtime, and especially not on the NPU.
 - AWQ is what makes the NPU model usable: FLM Q4_0 AWQ is within a few
   percentage points of the full-precision model.
-- Full-precision embeddings do not matter: they neither significanly improve
+- Full-precision embeddings do not matter: they neither significantly improve
   the performance, nor make it worse.
 
 ## Speed
 
-The advantage of NPU is power efficiency, but besides the performance, 
-spees is another trade off. Sol let's put a numnber on it. 
+The advantage of the NPU is power efficiency, but besides the quality, speed is
+another trade-off. So let's put a number on it, starting with the GPU baseline.
 
 ### llama.cpp on the GPU
 
-Luckily, llama.cpp has a built-in utility for measuring model throughput, which
-I used to benchmark performance:
+llama.cpp has a built-in utility for measuring model throughput, `llama-bench`,
+which I used to benchmark performance:
 
-- across the two backends,
+- across the two backends, [Vulkan and ROCm](#vulkan-or-rocm),
 - for two quantization levels,
 - across input and output sizes realistic for FIM tasks.
 
@@ -1203,24 +1214,24 @@ and ROCm is noticeably faster for the F16 variant, while Vulkan is faster for Q4
 Treat these conclusions with a grain of salt, though. I noticed that the same
 parameters can yield wildly different results within the different retries of
 the same experiment run. The likely culprit is thermal throttling: giving the
-GPU time to cool down between runs seemed to help, and the results become much
+GPU time to cool down between runs seemed to help, and the results became much
 more stable. However, I have not tested this hypothesis directly, so I cannot
 guarantee that the results shown here are not affected by it, rather than being
 stable because they are equally affected.
 
 ### FLM on the NPU
 
-FLM has no equivalent of llama-bench, we use a custom script that attempts to
-replicated llama-bench's metrics on FLM. 
+Since FLM has no equivalent of llama-bench, we use a custom script that attempts
+to replicate llama-bench's metrics on FLM. 
 
 <details style="font-size: 0.8em; color: var(--secondary);">
   <summary>One small trick we had to use ...</summary>
 
   ... was retrying generations that stopped early. FLM does not allow ignoring
-  the EOS token, so some retries end early. Therefore, if the finishing reason
+  the EOS token, so some runs end early. Therefore, if the finishing reason
   reported by FLM is not length, we retry with a different prompt.
 
-  Another difference compared to llama-bench os that FLM does not allow passing
+  Another difference compared to llama-bench is that FLM does not allow passing
   empty prompts, so we use a short, 16-token long, prompt before generating
   output. 
  
@@ -1228,7 +1239,7 @@ replicated llama-bench's metrics on FLM.
   temperature 0.2, top_p 0.95 and top_k 40, and turned off the repetition
   penalties that FLM's defaults add.
 
-  Because of these reasons, the numbers are not exacly apples-to-apples, but
+  Because of these reasons, the numbers are not exactly apples-to-apples, but
   rather just give a good feeling of where the backends stand in terms of speed.
 </details>
 <br/>
