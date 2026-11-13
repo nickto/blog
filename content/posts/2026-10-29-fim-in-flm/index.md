@@ -10,56 +10,68 @@ TocOpen: true
 My GitHub Copilot subscription, paid for by a previous employer, has recently
 ended. So before paying for it out of my own pocket, I decided to check whether
 I can run a local model for inline suggestions: these do not require powerful
-models, after all. And yes, of course, you can. But even running it on a GPU is
-trickier than I expected, not to mention running it on an NPU.
+models, after all. 
+
+And yes, of course, you can. But everything ended up being trickier than I
+expected. Even running the model on a GPU had it quirks, not to mention running
+it on an NPU.
 
 ## Fill-in-the-middle
 
 We are mostly used to chat models that generate text left-to-right: the next
-token is generated using the context that precedes it. Inline suggestions
-are slightly different: both the context before and after the cursor matter.
-E.g., for a docstring we need to know both the function name with arguments and
-the function code.
+token is generated using the context that precedes it. Inline suggestions are
+slightly different: both the context before and after the cursor matter. E.g.,
+for a docstring we need to know both the function's name along with arguments
+and the function's body.
 
 Models used for this type of task are commonly trained with the
 _fill-in-the-middle_ (FIM) objective, proposed by [Bavarian, M., et al. in
-2022](https://arxiv.org/abs/2207.14255). This is not a different model
-architecture, but rather a different training objective, where, given the text
-before and after the missing part, the model should fill in the missing part. 
+2022](https://arxiv.org/abs/2207.14255). This is neither a different model
+architecture, not a different loss function, rather a different training goal,
+where, given the text before and after the missing part, the model should fill
+in the missing part. 
 
-Technically, most LLMs should be able to do the task if we describe what we
-expect from them in the prompt. But this is very chatty, less efficient, and
-more likely to produce an output format we do not expect. For this reason,
-inline suggestion tools format their requests to LLMs in a special FIM format.
-However, not all models understand it because in order to do so, the model
-should have been trained on this format. So we need to narrow down the list of
-models to the ones that were.
+It is worth noting that, technically, most LLMs should be able to do the task if
+we describe what we expect from them in the prompt. But this is very chatty,
+less efficient, and more likely to produce an output format we do not expect.
+For this reason, inline suggestion tools format their requests to LLMs in a
+special FIM format. However, not all models understand it because in order to do
+so, the model should have been trained on this format. So we need to narrow down
+the list of models to the ones that were.
 
-[Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is one of
-these models, and it is the one I use throughout this post. Why this one in
-particular will become clear in the [FastFlowLM](#fastflowlm) section.
+[Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is one of such
+models, and it is the one I use throughout this post. Why this one in particular
+will become clear in the [FastFlowLM](#fastflowlm) section.
 
 ### The prompt format
 
-Let's take a simple example: we want the model to fill in the line where the
-comment is.
+Let's take a simple example. Say, we have the following function: 
 
 ```python
 def add(a, b):
-    # Complete here
+    c = a + b
     return c
 ```
 
-In the case of Qwen 2 models, this request should be formatted as the following prompt:
+where `c = a + b` is the middle part that should be filled in. Then this function will
+be represented in the training data set in the following way:
 
-```json
-"<|fim_prefix|>def add(a, b):\n    <|fim_suffix|>\n    return c<|fim_middle|>"
+```text
+<|fim_prefix|>def add(a, b):
+    <|fim_middle|>c = a + b<|fim_suffix|>
+    return c
 ```
 
-where we first supply the prefix, or the part that goes before the completion, then
-the suffix, or the part that goes after the completion, and ask the model to
-fill in the middle, or the actual completion. So the full request looks like 
-this
+And during inference, this request should be formatted as the following prompt
+for Qwen 2 models: 
+
+```text
+<|fim_prefix|>def add(a, b):
+    <|fim_suffix|>
+    return c<|fim_middle|>
+```
+
+So the actual JSON request to the LLM looks like this
 
 ```json
 {
@@ -73,7 +85,7 @@ this
 ## Baseline: llama.cpp on the GPU
 
 Running on GPU, regardless of whether it is discrete or integrated, is
-straightforward: just find a suitable model and serve with
+relatively straightforward: just find a suitable model and serve with
 [llama.cpp](https://github.com/ggml-org/llama.cpp) using the backend that your
 GPU supports.
 
@@ -82,24 +94,25 @@ GPU supports.
 I have an integrated Radeon 890M, which supports both Vulkan and ROCm on Linux, 
 so I have to pick.
 
-**Vulkan** is a cross-vendor, low-level graphics API that also supports compute
-shaders. llama.cpp's Vulkan backend expresses the same operations as generic
-shaders, which the driver then compiles for whatever GPU is there.
-
-**ROCm** is AMD's GPU compute platform, an answer to NVIDIA's CUDA. Its main
-programming model is HIP, which looks like CUDA and compiles to code written
-specifically for AMD GPU architectures. llama.cpp has a dedicated HIP backend
-for it.
+- [Vulkan](https://en.wikipedia.org/wiki/Vulkan) is a cross-vendor, low-level
+  graphics API that also supports general-purpose compute. Its GPU programs are
+  called shaders, a name inherited from graphics, but a compute shader is just a
+  function that runs in parallel across thousands of GPU threads.
+- [ROCm](https://en.wikipedia.org/wiki/ROCm) is AMD's vendor-specific GPU
+  compute platform: an answer to Nvidia's
+  [CUDA](https://en.wikipedia.org/wiki/Cuda). Its main programming model is HIP,
+  which looks like CUDA and compiles to code written specifically for AMD GPU
+  architectures.
 
 Vulkan only needs the regular graphics driver, so it is much easier to set up,
-and because it is cross-vendor, it has larger adoption and is more stable. ROCm
-is vendor-tuned and targets the hardware directly, so one can expect that
-matrix-multiplication should be faster on ROCm. On the flip side, support for
-integrated GPUs is often unofficial, and therefore the whole setup can be less
-stable and require some fiddling to make it work. For example, the 890M needs
-`HSA_OVERRIDE_GFX_VERSION=11.0.0` to make ROCm treat it as an RDNA 3 GPU
-(gfx1100) instead of its actual RDNA 3.5 architecture (gfx1150), for which ROCm
-has no kernels.
+Because it runs on any GPU (be it AMD's or Nvidia's) it has larger adoption and
+is more stable. ROCm is vendor-specific and targets the hardware directly. But
+in return one can expect that matrix multiplication should be faster on ROCm. On
+the flip side, support for integrated GPUs is often unofficial, and therefore
+the whole setup can be less stable and require some fiddling to make it work.
+For example, the 890M needs `HSA_OVERRIDE_GFX_VERSION=11.0.0` to make ROCm treat
+it as an RDNA 3 GPU (gfx1100) instead of its actual RDNA 3.5 architecture
+(gfx1150), for which ROCm has no kernels.
 
 Which of the two is faster for our use case, we will see in the
 [Speed](#speed) section.
@@ -163,24 +176,27 @@ Another option is to run on an NPU, e.g., I have an AMD Ryzen AI 9 HX 370, which
 has one built in. An NPU (neural processing unit) is an accelerator that is
 basically built for efficient matrix multiplication. And neural networks mostly
 consist of matrix multiplications, so it is very suitable for running them.
-Unlike a GPU, its goal is energy efficiency rather than peak speed.
+Unlike a GPU, its goal is energy efficiency rather than peak speed
+([AMD](https://www.amd.com/en/blogs/2023/on-chip-ai-integration-is-the-future-of-pc-computi.html)
+itself positions it for sustained AI workloads at low power).
 
-A GPU is very flexible: it decides how to schedule the work while it is running,
-so it can handle almost any parallel computation. An NPU saves power by having
-this decided in advance, when the model is compiled for it. The result is
-efficient, but only for the exact computation it was prepared for.
+How does it achieve this efficiency? It's a trade off. A GPU is very flexible:
+it decides how to schedule the work while it is running, so it can handle almost
+any parallel computation. An NPU saves power by having this decided in advance,
+when the model is compiled for it. The result is efficient, but only for the
+exact computation it was prepared for.
 
 The practical consequence of that is that you cannot just run any model on it,
 like on a GPU. Each model has to be specifically prepared for the hardware so
 the choice of the models that can run on it is very limited.
 
-If running models on NPU is hard, why use it at all? Well, the inline
+If running models on NPU is hard, why use it at all for our task? The inline
 suggestions are a background task: they fire constantly while you type. So
 running them on a GPU is hard to miss: its load sits close to 100% almost all of
-the time. Its small iGPU cannot heat your whole house, but can work as a good
-hand warmer, which is nice. But it drains the battery, which is not nice. And
-because NPUs are supposed to be much more energy efficient than GPUs, running
-models for such background tasks on NPU sounds very appealing.
+the time. Even if small iGPU cannot heat your whole house, it still can work as
+a good hand warmer, which is nice. But it drains the battery, which is not nice.
+So hopefully, by running the model on an NPU, will lose the hand-warmer feature,
+but save the battery.
 
 ## FastFlowLM
 
@@ -202,17 +218,13 @@ FLM offers a pretty [wide choice of smaller
 LLMs](https://fastflowlm.com/docs/models/) (and a couple of other neural
 networks). 
 
-Among many others, they ship:
-
-- [Qwen3.6-35B-A3B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen36-35b-a3b),
-  which is powerful, yet fast, because only a small part of it is used for each
-  individual token generation (the "A3B" in the name).
--
-  [Qwen2.5-3B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct),
-  which is a bit boring in itself, and because it is an Instruct rather than a
-  Coder variant, it cannot do FIM. But it is crucial that this model is
-  available, because it comes from a family of models that _does_ have a Coder
-  variant. And we will use it to run inline suggestions.
+Among many others, they ship
+[Qwen2.5-3B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct).
+Admittedly, it a bit boring in itself, but it's existence is crucial for our
+exercise. Even though it is an Instruct rather than a Coder variant---and
+therefore cannot do FIM---it comes from a family of models that share the same
+architecture and include a Coder variant. And we will use it to run our inline
+suggestions.
 
 The list is constantly being updated, so it's worth keeping an eye on. E.g., last
 time I checked,
@@ -221,13 +233,14 @@ was not there yet, but is there now.
 
 Moreover, besides the usual `/v1/chat/completions` endpoint, which is used for
 chats, FLM also supports the [legacy
-`/v1/completions`](https://github.com/ROCm/FastFlowLM/releases/tag/v0.9.13) one,
-and this is another crucial piece that makes inline suggestions possible.
+`/v1/completions`](https://github.com/ROCm/FastFlowLM/releases/tag/v0.9.13)
+endpoint, and this is another key piece that makes inline suggestions possible.
 
 The difference between the two endpoints is what happens to your text. The chat
 endpoint takes a list of messages, and the server wraps them in the model's chat
-template before the model sees them. The completions endpoint takes a raw
-prompt, passes it to the model as is, and the model simply continues it.
+template before the model sees them. The completions endpoint, on the other
+hand, takes a raw prompt, passes it to the model as is, and the model simply
+continues it.
 
 FIM needs the latter, because a FIM request is not a conversation. It is a
 single string that contains the context before and after where we want the
@@ -263,20 +276,21 @@ if the models share the exact same architecture. This is the approach used in
 [this project](https://github.com/ROCm/FLM_Q4NX_Converter).
 
 And we are in luck here again, because the commonly recommended models for
-inline completions are the smaller versions of Qwen2.5-Coder. Since
-[Qwen2.5-3B-Instruct](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct)
-is officially supported and has the same architecture as Qwen2.5-Coder-3B, we
-can reuse its kernels and convert the Coder weights to Q4NX, the format FLM's
+inline completions are the smaller versions of Qwen2.5-Coder. Since, as we have
+already figured out, [Qwen2.5-3B
+Instruct](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct)
+_is_ officially supported and has the same architecture as Qwen2.5-Coder-3B, we
+can reuse its kernels and convert the Coder weights to Q4NX: the format FLM's
 models use.
 
-### The naive conversion
+### The deception of a naive conversion
 
-[FLM Q4NX Converter](https://github.com/ROCm/FLM_Q4NX_Converter) expects a Q4_0
-or Q4_1 quantized weights in GGUF format. And the [model's
+[FLM Q4NX Converter](https://github.com/ROCm/FLM_Q4NX_Converter) expects Q4_0 or
+Q4_1 quantized weights in GGUF format. And the [model's
 card](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct)
-says that it uses the Q4_1 quantization, so we go to
-[Hugging Face](https://huggingface.co/Qwen/Qwen2.5-Coder-3B), download the
-weights, convert them to GGUF, quantize to Q4_1, and convert to Q4NX.
+says that it uses the Q4_1 quantization, so we go to [Hugging
+Face](https://huggingface.co/Qwen/Qwen2.5-Coder-3B), download the weights,
+convert them to GGUF, quantize to Q4_1, and convert to Q4NX.
 
 Sounds easy, does not work. The model produces garbage.
 
@@ -314,15 +328,15 @@ configs. So I tried mixing and matching them, taking some files from the Hugging
 Face checkpoint and some from the official NPU2 release. No luck.
 
 Then, before giving up, I asked an LLM what might be wrong (should have done
-that first, haha).
+that ealier, haha).
 
-### Q4_0 and Q4_1
+### Q4_0 and Q4_1: same but different
 
 To make sense of what it found, we first need to know the difference between
 Q4_0 and Q4_1 quantization. Both are 4-bit quantization formats: weights are split into
-smaller groups, and each weight is stored as a 4-bit integer `q`, which takes a
+smaller groups, and each weight is stored as a 4-bit integer $q$, which takes a
 _nibble_ (half a byte), plus a scale shared by the whole group. What differs is
-how a group is turned back into numbers:
+how a group of nibbles is turned back into floating point numbers:
 
 - **Q4_0** stores one scale $d$ per group and reconstructs a weight as $d \times (q -
   8)$. The nibble is effectively signed: 8 (`1000`) means zero, values below it
@@ -336,8 +350,8 @@ how a group is turned back into numbers:
 
 The extra parameter makes Q4_1 a bit more precise: on a few sampled tensors, the
 relative error of the dequantized weights against the original ones was about
-10% lower for Q4_1 than for Q4_0, for about 11% more size. So if the kernel
-supports it, there is little reason not to use it.
+10% lower for Q4_1 than for Q4_0. So if the kernel supports it, there is little
+reason not to use it.
 
 ### The card says Q4_1, the weights say Q4_0
 
@@ -345,16 +359,15 @@ Instead of guessing further, the LLM went straight to the weights. It wrote a
 small decoder for the Q4NX file, and compared the official Qwen2.5-3B-Instruct
 with my Q4_1 conversion of the Coder.
 
-The first clue is the offsets. In my Q4_1 conversion, every group has a
-non-zero offset, as expected: the offset is the smallest weight in the group,
-and that is practically never exactly zero. In the official model, all 96
-million groups have an offset of zero. Whatever the official model is, it is not
-real Q4_1.
+The first clue is the offsets. In my Q4_1 conversion, every group has a non-zero
+offset, as expected: the offset is the smallest weight in the group, and that is
+practically never exactly zero. In the official model, all 96 million groups
+have an offset of zero. Whatever the official model is, it is not a real Q4_1.
 
 A zero offset alone only says that the offset is not used, though, not what the
-format is instead. To find out, the LLM looked at the distribution of the nibble
-values. Weights in a group are roughly bell-shaped around their center, so the
-most common nibbles show where the encoding puts that center:
+format is. To find this out, the LLM looked at the distribution of the nibble values.
+Weights in a group are roughly bell-shaped around their center, so the most
+common nibbles show where the encoding puts that center:
 
 - If the nibbles are unsigned, 0 to 15 is one continuous scale, and the
   center lands in the middle: 7 (`0111`) and 8 (`1000`).
@@ -374,6 +387,12 @@ One more clue points the same way: about half of the official scales are
 negative. A Q4_1 scale is always positive, because it spans the group from its
 smallest weight to its largest. A Q4_0 scale can carry a sign.
 
+One more clue points the same way: about half of the official scales are
+negative. A Q4_1 scale is always positive, because the scale is effectively the
+group'ss range, and the sign is captured by an offset. A Q4_0 scale can carry a
+sign: the quantizer maps the group's largest-_magnitude_ weight onto the −8
+level, so if that weight is positive, the scale comes out negative.
+
 In other words, the official model does not look like Q4_1 at all. It looks
 like Q4_0.
 
@@ -385,15 +404,16 @@ weights? So we (me and my LLM detective) collected more evidence:
   `llama3.2`), so it does distinguish between the two.
 - The converter's Qwen2 config has `Q4_0` as the default tensor type.
 
-So the model card is the odd one out. I do not know why it says Q4_1.
+So the model card is the odd one out. I do not know why it says Q4_1. Probably
+just a typo.
 
-What makes this trap particularly nasty is that there are no errors along the
-whole pipeline. The converter accepts Q4_1 without a warning and writes a file
-of exactly the same size as the Q4_0 one. FLM loads it just fine. It only breaks
-inside the closed kernel, which seems to simply ignore the offset: zeroing all
-the offsets in my Q4_1 file gave the same garbage, token for token. And the
-offset is not a small correction you can afford to lose. It is about 40% of the
-weights' magnitude!
+What makes this trap particularly nasty is that there are no during the whole
+conversion process: the converter accepts Q4_1 without a warning and writes a
+file of exactly the same size as the Q4_0 one, and FLM loads it just fine. It
+only breaks inside the closed kernel, which seems to simply ignore the offset:
+zeroing all the offsets in my Q4_1 file gave the same garbage, token for token.
+And the offset is not a small correction you can afford to lose. It is about 40%
+of the weights' magnitude!
 
 So I converted the Coder from Q4_0 instead, and the model started producing
 code! 🥳
@@ -432,7 +452,8 @@ for FLM. However, there are two conspicuous issues.
 The first one is the special token leakage, i.e. `<|fim_middle|>`. Not only
 special tokens should not be returned as plain text, but also the usage of this
 token does not make sense: it is used to indicate the start of the middle
-section, and it is what we end our prompt with.
+section, and it is what we end _our_ prompt with, not something that should
+appear in the generated text.
 
 But even if we strip this special token, there is still the second issue: the
 completed code is actually bad:
@@ -445,7 +466,8 @@ def add(a, b):
 ```
 
 It got the indentation wrong, and even if we ignore the extra space, the
-function will not work.
+function will get stuck in infinite recursion (or rather throw a
+`RecursionError` in Python).
 
 ### Stop tokens
 
@@ -472,8 +494,9 @@ By default, FLM's Instruct model stops only on `<|endoftext|>` and `<|im_end|>`
 FIM tokens appears in the output, the model has most likely gone astray, so the
 inline completion should stop too.
 
-There are also two other tokens, which make sense to add to our stop
-token set:
+There are also two other tokens, which make sense to add to our stop token set
+because they are the training artifacts and also should never appear in the
+generated inline completion:
 
 - `<|repo_name|>`: indicates the start of the repository name, which opens a
   repository-level prompt.
@@ -588,19 +611,18 @@ def add(a, b):
 ```
 
 This code would actually work! The second return statement might attract a
-linter complaint at most. But it is still not great: clearly not what we
-wanted. So on its own, this tweak does not fully fix the bad completions. It is
-still worth keeping, though, because there is little downside and it does not
-conflict with the fix we will get to later. But whether the
-full-precision embeddings add anything on top of it, we will see in the
-[evaluation](#quality).
+linter complaint at most. But it is still not great: clearly not what we wanted.
+So on its own, this tweak does not fully fix the bad completions. It is still
+worth keeping, though, because there is little downside and it does not conflict
+with the fix we will get to later. But whether the full-precision embeddings add
+anything on top of it, we will see in the [evaluation](#quality).
 
 ### The official model is not plain Q4_0
 
 With the special tokens and the embeddings sorted out, the completions were
-still bad. And not only on our smoke-test prompt: on a larger (but still
-ad-hoc) set of prompts, the model doubled tokens (`ret ret`), dropped
-them, threw in stray Cyrillic, or returned nothing at all.
+still bad. And not only on our smoke-test prompt: on a larger (but still ad-hoc)
+set of prompts, the model doubled tokens (`ret ret`), dropped them, threw in
+stray Cyrillic, or returned nothing at all.
 
 Was it FLM's fault? Partly. The same Q4_0 GGUF in llama.cpp did much better, yet
 it still showed milder versions of the same flaws. So FLM made things worse, but
@@ -608,16 +630,16 @@ the root of the problem seemed to be somewhere else.
 
 Since llama.cpp suffered from the same flaws, the problem had to be in the model
 file itself, so the quantization was the main suspect. But FLM's official
-Qwen2.5-3B-Instruct is also Q4_0, and it works fine. 
+Qwen2.5-3B-Instruct is also Q4_0, and it works reasonably well. 
 
 FLM does not ship an official Coder model to compare against. So I ran my
 pipeline on Qwen2.5-3B-Instruct instead and compared the result with the
 official Q4NX file. The idea was to double-check my conversion: is my pipeline
 producing the same quantized weights given the same full-precision input? I
-expected them to be bit-identical: after all, FLM does not openly claim to do any
-additional fine-tuning or other optimisation. But the weights were different.
-Only about a quarter of the tensors (109 of 435: the embedding, the final norm,
-and almost all of the biases) were bit-identical. 
+expected them to be bit-identical: after all, FLM does not openly claim to do
+any additional fine-tuning or other optimisation. But the weights were
+different. Only about a quarter of the tensors (109 of 435: the embedding, the
+final norm, and almost all of the biases) were bit-identical. 
 
 So, it turns out that the weight matrices differed, and they did so in a very
 particular way: the way AWQ changes them. The next section explains how AWQ
@@ -636,8 +658,8 @@ errors come from.
 
 Q4_0 splits the weights into small groups (groups of 32 weights to be precise,
 but it is not important for us). Each group gets one scale $d$, in order to fit
-the range of the original floating point values into the −8 to +7 range of
-4-bit integers. This can be described more formally as $d = \max |w| \div 8$.
+the range of the original floating point values into the −8 to +7 range of 4-bit
+integers. This can be described more formally as $d = \max |w| \div 8$.
 
 Thus, every weight is rounded to the nearest multiple of $d$, so it is off by at
 most $d \div 2$, no matter how large or small the weight is.
@@ -654,9 +676,14 @@ largest one is −0.80, so $d = 0.80 \div 8 = 0.1$, and $d \div 2 = 0.05$:
 
 Only the integers are stored, plus one $d$ per group.
 
-What we care about, though, is not the rounding error of the weights
-themselves, but the error they produce in the layer's output. Let's have a look at a single layer example:
-`$$y = \sigma(W x) = \sigma(h),$$`
+What we care about, though, is not the rounding error of the weights themselves,
+but the error they produce in the layer's output. Let's have a look at a single
+layer example:
+
+`\begin{equation*}
+y = \sigma(W x) = \sigma(h),
+\end{equation*}`
+
 where 
 
 - $W$ is an $m \times n$ weight matrix, 
@@ -676,44 +703,47 @@ images, where each pixel has a red, a green and a blue channel. Neural networks
 kept the term for the separate features at each position, and in a linear
 layer, each input feature $x_i$ is its own channel. Consider the following
 example:
-`$$
-y = \sigma \left( W \cdot x \right) =
-\begin{bmatrix}
-  y_1 \\
-  y_2 \\
-  y_3
-\end{bmatrix} =
-\sigma \left(
-\begin{bmatrix}
-  w_{11} & w_{12} & w_{13} \\
-  w_{21} & w_{22} & w_{23} \\
-  w_{31} & w_{32} & w_{33}
-\end{bmatrix}
-\begin{bmatrix}
-  x_1 \\
-  x_2 \\
-  x_3
-\end{bmatrix} \right) = 
-\sigma \left(
-\begin{bmatrix}
-  \mathbf{w_{11} x_1} + w_{12} x_2 + w_{13} x_3 \\
-  \mathbf{w_{21} x_1} + w_{22} x_2 + w_{23} x_3 \\
-  \mathbf{w_{31} x_1} + w_{32} x_2 + w_{33} x_3
-\end{bmatrix}
-\right)
-$$`
+
+`\begin{equation*}
+  y = \sigma \left( W \cdot x \right) =
+  \begin{bmatrix}
+    y_1 \\
+    y_2 \\
+    y_3
+  \end{bmatrix} =
+  \sigma \left(
+  \begin{bmatrix}
+    w_{11} & w_{12} & w_{13} \\
+    w_{21} & w_{22} & w_{23} \\
+    w_{31} & w_{32} & w_{33}
+  \end{bmatrix}
+  \begin{bmatrix}
+    x_1 \\
+    x_2 \\
+    x_3
+  \end{bmatrix} \right) = 
+  \sigma \left(
+  \begin{bmatrix}
+    \mathbf{w_{11} x_1} + w_{12} x_2 + w_{13} x_3 \\
+    \mathbf{w_{21} x_1} + w_{22} x_2 + w_{23} x_3 \\
+    \mathbf{w_{31} x_1} + w_{32} x_2 + w_{33} x_3
+  \end{bmatrix}
+  \right)
+\end{equation*}`
+
 Notice how the activation `$x_1$` contributes to the output only via column 1 of
 the matrix $W$. So each channel has its own column of weights, and whatever
-happens to channel $i$---both `$x_i$` and its column---affects every output. Also notice the contrary: each output is a sum with one term from every channel.
+happens to channel $i$---both `$x_i$` and its column---affects every output.
+Also notice the contrary: each output is a sum with one term from every channel.
 
 ### Not all channels are born equal
 
 Quantization groups run along the rows, so each weight in a group belongs to a
-different channel. And not all channels are equally important
-for the output. We have already shown that weights have rounding errors, but
-their errors are all within $d \div 2$ in a group. What makes them drastically
-unequal are the activations they are applied to. To illustrate this, let's
-extend our numerical example above with activations $x$.
+different channel. And not all channels are equally important for the output. We
+have already shown that weights have rounding errors, but their errors are all
+within $d \div 2$ in a group. What makes them drastically unequal are the
+activations they are applied to. To illustrate this, let's extend our numerical
+example above with activations $x$.
 
 | Channel |     $w$ |  $x$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
 | ------: | ----: | -: | --------: | ----: | --------: |
@@ -725,8 +755,8 @@ extend our numerical example above with activations $x$.
 
 The rounding errors of channels 2 and 4 are about the same, but channel 2
 contributes almost all of the output error. So some channels are clearly more
-important for the output and we want to focus on retaining their precision, even at
-the expense of other, less important channels. AWQ exploits this in two ways:
+important for the output and we want to focus on retaining their precision, even
+at the expense of other, less important channels. AWQ exploits this in two ways:
 scaling and clipping: the former improves precision by focusing on channels with
 large activations, and the latter gives up precision in low activation channels
 in order to improve it in the rest.
@@ -739,6 +769,7 @@ which decreases the total output error.
 
 Why does this work? Let's look at the error of output $j$ before the
 non-linearity $\sigma$ is applied:
+
 `$$
 \epsilon_j = \hat{h}_j - h_j = \sum_i \hat{w}_{ji} x_i - \sum_i w_{ji} x_i =
 \sum_i (\hat{w}_{ji} - w_{ji}) x_i,
@@ -784,67 +815,68 @@ is still −0.80, so $d$ is still 0.1:
 |       4 |  0.33 |   1 |        0.30 |           0.03 |                              0.03 |
 |   Total |       |     |             |                |                          **0.13** |
 
-The rounding error of channel 2 is still 0.04, but it is now multiplied by 2.5
+The rounding error of weight 2 is still 0.04, but it is now multiplied by 2.5
 instead of 10. So the contribution of channel 2 dropped four times, from 0.40 to
 0.10, and the total error dropped from 0.43 to 0.13.
 
 So why not take a huge $s$? Because at some point the scaled weight becomes the
-largest in its group, so we need to pick a larger $d$, which decreases
-the precision for the rest of the group. And remember that $s$ applies to the
-whole column, which crosses many groups, so the same $s$ has to work for all of
-them. Too little scaling does not help, too much hurts, so the right $s$ has to
-be found by a search.
+largest in its group, and we have to choose a larger $d$, which decreases the
+precision for the rest of the group. And remember that $s$ applies to the whole
+column, which crosses many groups, so the same $s$ has to work for all of them.
+Too little scaling does not help, too much hurts, so the right $s$ has to be
+found by a search.
 
-But how do we know which activations are large? Unlike the weights, they are
-not part of the model: they depend on the data. AWQ solves this with
-_calibration_: it runs the model on some representative sample and records
-the activations of each layer. The average magnitude of each channel tells it
-which channels are important.
+But how do we know which activations are large? Unlike the weights, they are not
+part of the model: they depend on the data. AWQ solves this with _calibration_:
+it runs the model on some representative sample and records the activations of
+each layer. The average magnitude of each channel tells it which channels are
+important.
 
-AWQ then scales the channels with larger average activations more. How much
-more is found by a search, layer by layer: AWQ tries several sets of scales,
+AWQ then scales the channels with larger average activations more. How much more
+is found by a search, layer by layer: AWQ tries several sets of scales,
 quantizes the scaled weights for each, runs the calibration activations through
 the layer, and keeps the set whose $h$ is closest to the original.
 
 {{< collapse summary="And the division by $s$ comes for free at inference time." openByDefault=false >}}
 
-This does not work in _every_ neural network, but it does in most LLMs.
-For instance, in our toy example this wouldn't work, because we feed the 
-output of non-linearity, $\sigma(Wx)$, directly as activation into the next layer.
+This does not work in _every_ neural network, but it does in most LLMs. For
+instance, in our toy example this wouldn't work, because we feed the output of
+non-linearity, $\sigma(Wx)$, directly as activation into the next layer.
 
-But in most transformers, the attention and MLP blocks start with some kind  
-of layer normalization. In Qwen2.5's case, for example, it's RMSNorm, which  
-multiplies each channel by its own learned weight. For the linear layers  
-right after it, we divide that weight by $s$. For other linear layers there are  
-similar tricks.
+In most transformers, the attention and MLP blocks start with some kind of layer
+normalization. In Qwen2.5's case, for example, it's RMSNorm, which multiplies
+each channel by its own learned weight. For the linear layers right after it, we
+divide that weight by $s$. For other linear layers there are similar tricks.
 
-This highlights, however, that AWQ cannot treat the model as a black box: 
-the architecture drives the decision on where to fold the scales, and 
-whether the folding is possible at all.
+This highlights, however, that AWQ cannot treat the model as a black box: the
+architecture drives the decision on where to fold the scales, and whether the
+folding is possible at all.
 
 {{< /collapse >}}
 
 ### Clipping
 
 Scaling tackled the activations in our error bound:
+
 `$$
 |\epsilon_j| \le \frac{d}{2} \sum_i |x_i|.
 $$`
+
 Clipping tackles the other term: $d$.
 
 Remember that $d$ is set by the largest weight in the group. So a single outlier
 forces a coarse grid on all the weights in the group. That is fine if the
-outlier belongs to an important channel. But if its activation is small, we waste
-the precision of the whole group on a weight whose error barely matters.
+outlier belongs to an important channel. But if its activation is small, we
+waste the precision of the whole group on a weight whose error barely matters.
 
 Clipping sets the ceiling on the magnitude of weights in our group below the
 current largest value. So the outliers above this cap get a worse error than
-before the clipping. It sounds bad, but could actually be fine, if the channels to
-which these outliers belong were not important. At the same time, we can now
-decrease $d$, thus making the grid finer, which on average should improve the 
+before the clipping. It sounds bad, but could actually be fine, if the channels
+to which these outliers belong were not important. At the same time, we can now
+decrease $d$, thus making the grid finer, which on average should improve the
 errors of the rest of the weights in the group.
 
-Thus, we trade the error of insignificant outliers for better precision of 
+Thus, we trade the error of insignificant outliers for better precision of
 important channels. If the total error decreases, we gain precision. 
 
 Back to our toy example before scaling. Channel 1 has the largest weight,
@@ -860,8 +892,8 @@ $d$ becomes  $0.64 \div 8 = 0.08$ and $d \div 2 = 0.04$, down from 0.05:
 |   Total |       |     |             |             |                |                          **0.25** |
 
 Channel 1 is now off by 0.16, which sounds like huge rounding error. And it is,
-but only for the weight itself, which we ultimately don't care about. And
-multiplied by an activation of 0.1, the contribution of this channel in the
+but only for the weight itself, which we ultimately don't care about, because
+when multiplied by an activation of 0.1, the contribution of this channel in the
 output error shrinks to 0.02. Meanwhile, the finer grid halves the error of the
 important channel 2, and the total drops from 0.43 to 0.25.
 
@@ -871,8 +903,8 @@ Cap the group at 0.32, for example, and channels 3 and 4 get clipped too: the
 total error climbs back to 0.44, worse than no clipping at all.
 
 Just like with scaling, the right cap depends on the activations, so AWQ finds
-it with the calibration data. For each group, it tries a range of caps and keeps
-the one with the smallest output error. This happens after scaling, on the
+it by using the calibration data. For each group, it tries a range of caps and
+keeps the one with the smallest output error. This happens after scaling, on the
 already scaled weights, so the two methods can be combined: scaling protects the
 important channels, and clipping prevents the unimportant ones from driving $d$.
 
@@ -880,11 +912,11 @@ Compared to scaling, there is one important aspect that we should be aware
 though. Scaling does not change what the layer computes, while clipping does:
 there is no analogue of the inverse scale for clipping. But given that we are
 already heavily quantizing the model, the weights are going to suffer anyway.
-Clipping just helps control where the error goes.
+Clipping just helps control where the error lands.
 
 Importantly, all of this happens in full precision _before_ quantization. The
-result is a normal checkpoint with the exact same architecture that computes almost
-the same values (only clipping changes it a bit). It's just that these
+result is a normal checkpoint with the exact same architecture that computes
+almost the same values (only clipping changes it a bit). It's just that these
 transformations help decrease the rounding errors in the subsequent 4-bit
 quantization. 
 
@@ -903,7 +935,7 @@ fingerprint my LLM detective found in the official model:
 - Some weight columns are multiplied by a scale $s$, and the layers right
   before them are adjusted to divide the matching activations by the same $s$,
   just like in the scaling trick above.
-- There is one place where AWQ could fold a scale, but
+- There is one place where AWQ _could_ fold a scale, but
   [AutoAWQ](https://github.com/casper-hansen/AutoAWQ), the popular AWQ
   implementation, does not do it for models like Qwen2.5. The official model is
   not scaled there either, which points to AutoAWQ specifically, not just to AWQ
@@ -923,35 +955,34 @@ AutoAWQ simulates something other than Q4_0. To get as close to Q4_0 as AutoAWQ
 allows, we need to set 4 bits (`w_bit=4`), groups of 32 (`q_group_size=32`), and
 signed values without an offset (`zero_point=False`).
 
-For calibration, I used AutoAWQ's default dataset, a sample of
-[the Pile](https://arxiv.org/abs/2101.00027): a large mix of English text from
-the web, books, scientific papers, code, and more. This is, arguably, not the
-best dataset for calibrating an in-line code completion model, but this
-exercise is a "proof of pipeline" rather than a hunt for the best possible
-performance.
+For calibration, I used AutoAWQ's default dataset, a sample of [the
+Pile](https://arxiv.org/abs/2101.00027): a large mix of English text from the
+web, books, scientific papers, code, and more. This is, arguably, not the best
+dataset for calibrating an in-line _code_ completion model, but this exercise is
+a "proof of pipeline" rather than a hunt for the best possible performance.
 
-Once AutoAWQ is done, the rest of the pipeline is unchanged: AutoAWQ outputs
-the same format as the original HF checkpoint, just with slightly different values.
-So the next steps are the same: GGUF → Q4_0 → Q4NX. And since AWQ does
-not touch the embedding, the full-precision embedding trick from the previous
-section still applies.
+Once AutoAWQ is done, the rest of the pipeline is unchanged: AutoAWQ outputs the
+same format as the original HF checkpoint, just with slightly different values.
+So the next steps are the same: GGUF → Q4_0 → Q4NX. And since AWQ does not touch
+the embedding, the full-precision embedding trick from the previous section
+still applies.
 
 In practice, there were a couple of gotchas when running on CPU:
 
 - There seems to be a bug in AutoAWQ, which shows up only on CPU. AutoAWQ backs
   up the weights with `v.cpu()`, which makes a copy when moving data from the
   GPU to the CPU. But if the tensor is already on the CPU, there is nothing to
-  move, so it returns the same tensor. So when the weights are modified in
-  place, the "backup" changes with them, and the weights end up scaled twice.
+  move, so it returns the same tensor. So when the weights are modified
+  in-place, the "backup" changes with them, and the weights end up scaled twice.
   As usual with annoying bugs, nothing crashes. But the resulting model does not
   work. Now my pipeline patches this part of the code in AutoAWQ to
   `v.cpu().clone()`, which always makes a copy.
 - It is painfully slow on CPU: about 108 seconds per layer, so almost two hours
   for the 3B model. I even tried optimizing the number of threads, but the gains
   were negligible. When you know that it will work, it is fine. But while
-  developing, mistakes are the norm, and every mistake gets expensive. After a
-  few failures, I lost patience and moved the AutoAWQ step to a GPU instance in
-  the cloud.
+  developing, mistakes are common, and every mistake gets expensive. After a few
+  failures, I lost patience and moved the AutoAWQ step to a GPU instance in the
+  cloud.
 
 ### Smoke test
 
@@ -1025,8 +1056,8 @@ in the [evaluation](#quality).
 ### The benchmark: SAFIM
 
 A single smoke-test prompt is not much of an evaluation, so we need a more
-rigorous test benchmark. Most popular code benchmarks, like HumanEval, give the
-model a function signature and a docstring and ask it to write the body. That is
+rigorous test. Most popular code benchmarks, like HumanEval, give the model a
+function signature and a docstring and ask it to write the body. That is
 left-to-right generation, not what inline suggestions do.
 
 [SAFIM](https://arxiv.org/abs/2403.04814) (Syntax-Aware Fill-in-the-Middle,
@@ -1041,12 +1072,11 @@ both the code before and after it. It has three subsets:
 - **API call** (310 tasks): a call to a library function is missing, together
   with its arguments.
 
-The tasks come in C++, Java, Python and C#, with C++ making up more than half
-of the block and control subsets.
+The tasks come in C++, Java, Python and C#.
 
 For the block and control subsets, the generated code runs against unit tests.
 Pass means all tests pass. Otherwise, we get the reason why it failed: it did
-not compile, crashed, timed out, gave a wrong answer, and so on. The API tasks
+not compile, crashed, timed out, gave a wrong answer, etc. The API tasks
 have no tests, so a completion passes if it matches the reference call (ignoring
 whitespace).
 
@@ -1070,11 +1100,12 @@ three SAFIM subsets.
   
   And for the differences, since they are paired, we have 4 possible outcomes:
   both model A and model B succeed, both fail, only model A succeeds, and only
-  model B succeeds. So we model them as a Dirichlet-multinomial distribution. And what we
-  are actually after is the difference between the probabilities of "only model
-  B succeeds" and "only model A succeeds", which equals the difference in pass
-  rates. The posterior of this difference has no closed form, so we sample from
-  the Dirichlet posterior and compute the difference for each draw.
+  model B succeeds. So we model them as a Dirichlet-multinomial distribution.
+  And what we are actually after is the difference between the probabilities of
+  "only model B succeeds" and "only model A succeeds", which equals the
+  difference in pass rates. The posterior of this difference has no closed form,
+  so we sample from the Dirichlet posterior and compute the difference for each
+  draw.
   
   In both cases we use improper priors: Beta(0, 0) and Dirichlet(0, 0, 0, 0)
   respectively.
@@ -1097,42 +1128,42 @@ plot the difference in pass rate of the variants and the F16 model.
 
 ![Each variant vs. full-precision](safim_diff_vs_f16.svg)
 
-Only the models from the decent group are at least comparable in performance
-to the full-precision variant. But even then, they are still noticeably worse:
-the 95% HPD does not contain 0, except for the API block, but it contains much 
-fewer samples, which inflates the variance.
+Only the models from the decent group are at least comparable in performance to
+the full-precision variant. But even then, they are still noticeably worse: the
+95% HPD does not contain 0, except for the API block, but it contains much fewer
+samples, which inflates the variance.
 
 ### Effect of each change
 
-Each variant differs from the others in a few ways at once, so let's isolate
-the effect of each change by comparing pairs that differ in just one thing.
+Each variant differs from the others in a few ways at once, so let's isolate the
+effect of each change by comparing pairs that differ in just one thing.
 
 #### Quantization
 
 ![Effect of quantization](safim_diff_quantization.svg)
 
-Going from F16 to plain Q4_0 on llama.cpp costs about 35--40
-percentage points. Given that the full-precision model solves about 60--65% of
-tasks, this is a huge hit.
+Going from F16 to plain Q4_0 on llama.cpp costs about 35--40 percentage points.
+Given that the full-precision model solves about 60--65% of tasks, this is a
+huge hit.
 
 #### AWQ
 
 ![Effect of AWQ](safim_diff_awq.svg)
 
-This is the big one. On the same runtime, AWQ adds about 30 to 36
-percentage points on llama.cpp and 34 to 48 percentage points on FLM. The gain
-on FLM is likely to be large because we simply started closer to the bottom.
+This is the big one. On the same runtime, AWQ adds about 30 to 36 percentage
+points on llama.cpp and 34 to 48 percentage points on FLM. The gain on FLM is
+likely to be large because we simply started closer to the bottom.
 
 #### Embeddings
 
 ![Effect of restored full-precision embeddings](safim_diff_bf16_embedding.svg)
 
 Restoring the full-precision embeddings was the first fix we tried to bring the
-performance closer to the full-precision variant. But it does not seem to help: the 0 is
-always within the 95% HPD range, except for the control block on the plain Q4_0
-variant, but it is actually even slightly worse. But the effect size is within a
-single percentage point. So restoring the embeddings' precision seems to be
-harmless, but it does not improve anything much either.
+performance closer to the full-precision variant. But it does not seem to help:
+the 0 is always within the 95% HPD range, except for the control block on the
+plain Q4_0 variant, but it is actually even slightly worse. But the effect size
+is within a single percentage point. So restoring the embeddings' precision
+seems to be harmless, but it does not improve anything much either.
 
 #### Runtime
 
@@ -1194,7 +1225,7 @@ To sum up:
 The advantage of the NPU is power efficiency, but besides the quality, speed is
 another trade-off. So let's put a number on it, starting with the GPU baseline.
 
-### llama.cpp on the GPU
+### llama.cpp on the GPU: Vulkan vs ROCm
 
 llama.cpp has a built-in utility for measuring model throughput, `llama-bench`,
 which I used to benchmark performance:
@@ -1209,7 +1240,8 @@ which I used to benchmark performance:
 
 The main takeaway here is that for inline completions, which typically have long
 prompts and short completions, it's prompt processing that is the bottleneck,
-and ROCm is noticeably faster for the F16 variant, while Vulkan is faster for Q4_0.
+and ROCm is noticeably faster for the F16 variant, while Vulkan is faster for
+Q4_0.
 
 Treat these conclusions with a grain of salt, though. I noticed that the same
 parameters can yield wildly different results within the different retries of
@@ -1284,7 +1316,7 @@ So on this machine, the NPU does not win on speed. The fixed per-request cost
 is especially unfortunate for inline completions, where the editor sends many
 short requests as you type.
 
-### Power draw
+## Power draw
 
 TODO
 
@@ -1305,9 +1337,9 @@ Getting there was a bit trickier than it sounds, though. Along the way we had to
 
 > TODO: update if the expanded EOS set changes anything in the rerun.
 
-- **Do activation aware quantization.** Plain Q4_0 runs, but the completions are
-  mostly unusable. AWQ, which is what the official model seems to use too,
-  brings most of it back.
+- **Do activation-aware weight quantization.** Plain Q4_0 runs, but the
+  completions are mostly unusable. AWQ, which is what the official model seems
+  to use too, brings most of it back.
 
 And one thing that did not matter: restoring the full-precision embeddings. It
 is free, so I'd keep it, but it does not change the quality in either direction.
