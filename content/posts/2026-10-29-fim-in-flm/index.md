@@ -1259,12 +1259,119 @@ So on this machine, the NPU does not win on speed. The fixed per-request cost
 is especially unfortunate for inline completions, where the editor sends many
 short requests as you type.
 
-```bash
-#!/usr/bin/env bash
-some
-bash
-code
-```
+### Power draw
 
-{{< /collapse >}}
--->
+TODO
+
+## Conclusions
+
+So, can you get inline suggestions from a model running on an AMD NPU? Yes. FLM
+does not ship a FIM-capable model, but Qwen2.5-Coder-3B has the same
+architecture as the officially supported Qwen2.5-3B-Instruct. So we can borrow
+the kernels of the latter and swap in the weights of the former.
+
+Getting there was a bit trickier than it sounds, though. None of the following
+gave an error, so each one had to be found by looking at the outputs (or the
+weights):
+
+- **The format.** The official model card says Q4_1, but the kernel expects
+  Q4_0. Feed it Q4_1, and it silently ignores the offsets and produces garbage.
+- **The stop tokens.** The Instruct model's config does not stop on the FIM
+  tokens, so they leak into the completions. Adding them to the EOS set fixes
+  that.
+  <!-- TODO: update if the expanded EOS set changes anything in the rerun. -->
+- **The quantization.** Plain Q4_0 runs, but the completions are mostly
+  unusable: about 35--40 percentage points below F16 on llama.cpp, and even
+  worse on FLM. AWQ, which is what the official model seems to use too, brings
+  most of it back.
+
+And one thing that did not matter: restoring the full-precision embeddings. It
+is free, so I keep it, but it does not change the pass rate in either
+direction.
+
+**Quality** turned out to be surprisingly good. The FLM AWQ variant is within a
+few percentage points of the full-precision model on llama.cpp. Given that
+I calibrated AWQ on the Pile, a general mix of text that is not particularly
+code-heavy, there is probably still some room for improvement with a
+code-specific calibration set.
+
+> **TODO:** update with the rerun using the fixed penalty parameters (and the
+> expanded EOS set). So far, it seems that the penalties help AWQ a bit, so the
+> FLM vs. llama.cpp gap for AWQ should shrink (and part of it should move from
+> "unexplained" to "FLM's defaults" in [Effect of runtime](#effect-of-runtime)),
+> while plain Q4_0 stays about the same. Update the numbers here and in the
+> "To sum up" list in [Results](#results).
+
+**Speed** is where the NPU loses. It generates at about 26 tokens per second,
+which is 63--73% of what llama.cpp does on the iGPU, and every request pays a
+fixed cost of about half a second before it even starts processing the prompt.
+End to end, a typical completion takes about 1.5 times longer than on the GPU.
+For inline suggestions, which fire constantly with relatively short prompts,
+this fixed cost is the most noticeable part.
+
+**Power** was the whole reason to bother with the NPU in the first place.
+
+> **TODO:** fill in from [Power draw](#power-draw), or, if that section is
+> dropped, say that I did not measure it properly and that the energy
+> efficiency remains the (plausible, but unverified) promise of the NPU.
+
+So, back to the opening question: is it worth using instead of paying for
+Copilot?
+
+> **TODO:** the actual answer, ideally after using it day to day for a while.
+> Points to cover:
+>
+> - A 3B model is not what Copilot runs, so do not expect the same quality, but
+>   for short, local completions it is decent.
+> - Is the extra latency noticeable in the editor, or is it fine in practice?
+> - Does the battery life / fan noise / heat make a difference compared to the
+>   iGPU?
+> - Which editor plugin I ended up using to connect to FLM (not covered in the
+>   post at all yet).
+
+## What next
+
+This post is a "proof of pipeline", so there is plenty left to try.
+
+**Better weights for the same kernel.** Everything that changes only the
+weights, and not the architecture, reuses the exact pipeline and kernel from
+this post:
+
+- _A better calibration set for AWQ._ The Pile is mostly not code. Calibrating
+  on code, ideally on FIM-formatted prompts, should protect the channels that
+  matter for this task specifically.
+- _Fine-tuning._ A FIM fine-tune of Qwen2.5-Coder-3B, or even one tuned on your
+  own repositories, changes the weights but not the shape, so the NPU kernel
+  stays the same. There is some evidence that FIM fine-tuning helps Qwen2.5-Coder
+  ([Gong et al., 2025](https://arxiv.org/abs/2505.18789)), although at 7B and
+  larger.
+- _Existing community fine-tunes._ There are already a few FIM fine-tunes of
+  Coder-3B on Hugging Face, though without published benchmarks.
+
+One caveat worth knowing: unlike the other Coder sizes, which are Apache 2.0,
+[Qwen2.5-Coder-3B](https://huggingface.co/Qwen/Qwen2.5-Coder-3B) is released
+under the more restrictive `qwen-research` licence.
+
+**Other model sizes.** Qwen2.5-Coder also comes in 0.5B, 1.5B, 7B, 14B and 32B.
+A smaller model would help with the speed, which is the NPU's weak spot here,
+and a larger one with the quality. Unfortunately, the trick in this post works
+only if FLM ships a kernel of exactly the same shape (number of layers, hidden
+size, attention heads), and for Qwen2.5 it ships only one text model: the 3B.
+So within Qwen2.5, we are stuck at 3B, and so are the fine-tunes of the other
+Coder sizes, like [Sweep
+Next-Edit](https://huggingface.co/sweepai/sweep-next-edit-1.5B) (1.5B) or Zed's
+[Zeta](https://huggingface.co/zed-industries/zeta) (7B).
+
+**Other model families.** FLM has a wider choice in newer families. For
+example, it ships Qwen3 at 0.6B, 1.7B, 4B and 8B, Llama 3.2 at 1B and 3B, and
+Gemma 3 at 1B and 4B. None of these are FIM models out of the box, but any FIM
+model that shares the shape of one of them is a candidate for the same trick.
+One potential lead is TIGER-Lab's FIM model built on Qwen3-8B.
+
+To be clear, these are ideas rather than a plan, and I have not tried any of
+them yet. Some of them may not work out for one reason or another: a
+fine-tune may turn out to differ from the base model in some detail that
+the kernel cares about, the licence may not allow it, FLM's kernel may make
+assumptions about the model that are not visible from the outside (like with
+Q4_1), or the resulting model may simply not be good enough for inline
+suggestions.
