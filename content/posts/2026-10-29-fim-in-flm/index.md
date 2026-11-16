@@ -1081,8 +1081,10 @@ have no tests, so a completion passes if it matches the reference call (ignoring
 whitespace).
 
 Generation settings are the same for both runtimes and follow SAFIM's defaults:
-sampling with temperature 0.2 and top-p 0.95, up to 128 new tokens. Each task
-gets one sample (attempt), so the pass rate is denoted as "pass@1".
+sampling with temperature 0.2 and top-p 0.95, up to 128 new tokens. On top of
+that, both runtimes use top-k 40 and no repetition, frequency or presence
+penalties (llama-server's defaults). Each task gets one sample (attempt), so the
+pass rate is denoted as "pass@1".
 
 ### Pass rate per variant
 
@@ -1142,7 +1144,7 @@ effect of each change by comparing pairs that differ in just one thing.
 
 ![Effect of quantization](safim_diff_quantization.svg)
 
-Going from F16 to plain Q4_0 on llama.cpp costs about 35--40 percentage points.
+Going from F16 to plain Q4_0 on llama.cpp costs about 32--40 percentage points.
 Given that the full-precision model solves about 60--65% of tasks, this is a
 huge hit.
 
@@ -1150,8 +1152,8 @@ huge hit.
 
 ![Effect of AWQ](safim_diff_awq.svg)
 
-This is the big one. On the same runtime, AWQ adds about 30 to 36 percentage
-points on llama.cpp and 34 to 48 percentage points on FLM. The gain on FLM is
+This is the big one. On the same runtime, AWQ adds about 29 to 36 percentage
+points on llama.cpp and 36 to 49 percentage points on FLM. The gain on FLM is
 likely to be large because we simply started closer to the bottom.
 
 #### Embeddings
@@ -1171,21 +1173,20 @@ seems to be harmless, but it does not improve anything much either.
 
 With the same weights and the same quantization, FLM scores lower than
 llama.cpp. For plain Q4_0 the gap is large: about 16 percentage points on
-control, 9 on block and 18 on API. With AWQ it shrinks to about 4 percentage
+control, 9 on block and 17 on API. With AWQ it shrinks to about 2 percentage
 points on control and block and disappears on API. But API has fewer samples, so
 is more noisy.
 
-Part of the AWQ gap comes from FLM's defaults rather than from the runtime
-itself. FLM loads Qwen2-family models with a repetition penalty of 1.1, a
-frequency penalty of 1.1 and top-k of 10, and keeps them for any field the
-request leaves out. llama-server applies no penalties and uses top-k of 40. Our
-harness sent only temperature, top-p and seed, so the two backends were sampling
-differently.
+Note that this is with the same sampler settings on both runtimes. FLM's own
+defaults for Qwen2-family models are different: a repetition penalty of 1.1, a
+frequency penalty of 1.1 and top-k of 10, applied to any field the request
+leaves out. My first run used them, and the AWQ variants on FLM scored slightly
+worse than with llama-server's defaults, so it is worth overriding them.
 
-The rest is unexplained. The weights are identical (FLM's q4nx files hold the
+So the gap is not explained by sampling. The weights are identical (FLM's q4nx files hold the
 same Q4_0 nibbles as the GGUFs), and the prompts tokenize to the same tokens.
 For plain Q4_0, about 60% of samples differ already at the first generated
-token, where penalties play no role, and these carry most of the gap (12 of 16
+token, and these carry most of the gap (12 of 16
 percentage points on control). So it seems likely that this is due to
 lower-precision arithmetic on the NPU, whose errors get amplified when the
 weights are already damaged by quantization. But this is just a plausible
@@ -1203,8 +1204,9 @@ more common. Specifically, the code does not compile, or the variants simply
 return an empty answer. 
 
 Note that "empty" here means that nothing was left after SAFIM's
-post-processing. Digging into the raw outputs, the model rarely stopped right
-away: in 70–87% of these cases it did generate code, but nothing of it parsed as
+post-processing. Digging into the raw outputs of the block subset, where empty
+answers are the most common, the model rarely stopped right away: in 69–87% of
+these cases it did generate code, but nothing of it parsed as
 a valid block, so the post-processing cut it all away. The rest are mostly the
 model stopping immediately or producing only whitespace. This matches what we
 saw in the smoke tests: broken quantization does not produce slightly worse
@@ -1217,6 +1219,8 @@ To sum up:
 - Plain Q4_0 is not usable, on either runtime, and especially not on the NPU.
 - AWQ is what makes the NPU model usable: FLM Q4_0 AWQ is within a few
   percentage points of the full-precision model.
+- With AWQ weights, the NPU runtime itself costs only about 2 percentage points
+  compared to llama.cpp.
 - Full-precision embeddings do not matter: they neither significantly improve
   the performance, nor make it worse.
 
@@ -1334,9 +1338,6 @@ Getting there was a bit trickier than it sounds, though. Along the way we had to
 - **Expand the EOS tokens.** The Instruct model's config does not stop on the
   FIM tokens, so they leak into the completions. Adding them and a few others to
   the EOS set fixes that.
-
-> TODO: update if the expanded EOS set changes anything in the rerun.
-
 - **Do activation-aware weight quantization.** Plain Q4_0 runs, but the
   completions are mostly unusable. AWQ, which is what the official model seems
   to use too, brings most of it back.
@@ -1344,15 +1345,10 @@ Getting there was a bit trickier than it sounds, though. Along the way we had to
 And one thing that did not matter: restoring the full-precision embeddings. It
 is free, so I'd keep it, but it does not change the quality in either direction.
 
-Quality turned out to be surprisingly good. The FLM AWQ variant is within a few
-percentage points of the full-precision model on llama.cpp 
-
-> **TODO:** update with the rerun using the fixed penalty parameters (and the
-> expanded EOS set). So far, it seems that the penalties help AWQ a bit, so the
-> FLM vs. llama.cpp gap for AWQ should shrink (and part of it should move from
-> "unexplained" to "FLM's defaults" in [Runtime](#runtime)),
-> while plain Q4_0 stays about the same. Update the numbers here and in the
-> "To sum up" list in [Summary](#summary).
+**Quality** turned out to be surprisingly good. The FLM AWQ variant is 6, 8 and
+2 percentage points behind the full-precision model on llama.cpp (control, block
+and API, respectively), and only about 2 percentage points behind the same AWQ
+weights on llama.cpp.
 
 **Speed** is where the NPU loses. It generates at about 26 tokens per second,
 which is about 70% of what llama.cpp does on the iGPU, and every request pays a
