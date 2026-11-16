@@ -199,7 +199,7 @@ suggestions are a background task: they fire constantly while you type. So
 running them on a GPU is hard to miss: its load sits close to 100% almost all of
 the time. Even if a small iGPU cannot heat your whole house, it still can work as
 a good hand warmer, which is nice. But it drains the battery, which is not nice.
-So hopefully, by running the model on an NPU, will lose the hand-warmer feature,
+So hopefully, by running the model on an NPU, we will lose the hand-warmer feature,
 but save the battery.
 
 ## FastFlowLM
@@ -407,7 +407,7 @@ weights? So we (me and my LLM detective) collected more evidence:
 So the model card is the odd one out. I do not know why it says Q4_1. Probably
 just a typo.
 
-What makes this trap particularly nasty is that there are no during the whole
+What makes this trap particularly nasty is that there are no exceptions during the whole
 conversion process: the converter accepts Q4_1 without a warning and writes a
 file of exactly the same size as the Q4_0 one, and FLM loads it just fine. It
 only breaks inside the closed kernel, which seems to simply ignore the offset:
@@ -495,8 +495,8 @@ FIM tokens appears in the output, the model has most likely gone astray, so the
 inline completion should stop too.
 
 There are also two other tokens, which make sense to add to our stop token set
-because they are the training artifacts and also should never appear in the
-generated inline completion:
+because they are training artifacts that should never appear in an inline
+completion:
 
 - `<|repo_name|>`: indicates the start of the repository name, which opens a
   repository-level prompt.
@@ -908,8 +908,7 @@ keeps the one with the smallest output error. This happens after scaling, on the
 already scaled weights, so the two methods can be combined: scaling protects the
 important channels, and clipping prevents the unimportant ones from driving $d$.
 
-Compared to scaling, there is one important aspect that we should be aware
-though. Scaling does not change what the layer computes, while clipping does:
+Compared to scaling, there is one important difference, though. Scaling does not change what the layer computes, while clipping does:
 there is no analogue of the inverse scale for clipping. But given that we are
 already heavily quantizing the model, the weights are going to suffer anyway.
 Clipping just helps control where the error lands.
@@ -1162,9 +1161,9 @@ likely to be large because we simply started closer to the bottom.
 
 Restoring the full-precision embeddings was the first fix we tried to bring the
 performance closer to the full-precision variant. But it does not seem to help:
-the 0 is always within the 95% HPD range, except for the control block on the
-plain Q4_0 variant, but it is actually even slightly worse. But the effect size
-is within a single percentage point. So restoring the embeddings' precision
+the 0 is always within the 95% HPD range, except for the control subset on the
+plain Q4_0 variant, where restoring the embeddings actually worsens the quality.
+Regardless, even there, the effect is within a single percentage point. So restoring the embeddings' precision
 seems to be harmless, but it does not improve anything much either.
 
 #### Runtime
@@ -1251,9 +1250,9 @@ Treat these conclusions with a grain of salt, though. I noticed that the same
 parameters can yield wildly different results within the different retries of
 the same experiment run. The likely culprit is thermal throttling: giving the
 GPU time to cool down between runs seemed to help, and the results became much
-more stable. However, I have not tested this hypothesis directly, so I cannot
-guarantee that the results shown here are not affected by it, rather than being
-stable because they are equally affected.
+more stable. However, I have not tested this hypothesis directly, so the
+results shown here may still be affected, and they may only look stable because
+every run was affected equally.
 
 ### FLM on the NPU
 
@@ -1306,8 +1305,8 @@ Here is how it compares to llama.cpp running the same Q4_0 model on the iGPU:
 | Metric               | FLM (NPU) | llama.cpp ROCm | llama.cpp Vulkan |
 |----------------------|----------:|---------------:|-----------------:|
 | Generation (t/s)     |        26 |           35.6 |             41.5 |
-| Prompt, 512 (t/s)    |       512 |    1,260--1,410 |     1,260--1,410 |
-| Prompt, 2048 (t/s)   |       898 |    1,220--1,320 |     1,220--1,320 |
+| Prompt, 512 (t/s)    |       512 |          1,261 |            1,415 |
+| Prompt, 2048 (t/s)   |       898 |          1,217 |            1,322 |
 
 FLM generates at 73% of the speed of ROCm and 63% of Vulkan. For a typical
 SAFIM-sized prompt of about 1,300 tokens and a 64-token completion, a
@@ -1337,7 +1336,7 @@ Looking at the power alone, the NPU wins easily. While processing a request,
 FLM draws on average 8 W above idle, while llama.cpp draws around 42 W on
 Vulkan and 43 W on ROCm.
 
-The NPU also wins without questions on the generation as well: it draws about
+The NPU wins on generation too: it draws about
 10 W above idle, while Vulkan and ROCm draw about 28 W and 46 W respectively.
 
 ![Power above idle per sample.](power_hist.svg)
@@ -1425,7 +1424,7 @@ which I learnt some new concepts and had to look under the hood of tools I had
 only ever used as black boxes. But subjectively, even though the suggestions
 make sense, they are rarely relevant enough for me to accept them, and the
 latency, especially on the NPU, is hard to miss. Still, for edge cases like an
-air-gapped or airplane-moded (pun intended) laptop, it is definitely better than
+air-gapped or airplaned (pun intended) laptop, it is definitely better than
 nothing!
 
 ## What next
@@ -1439,7 +1438,7 @@ this post:
 - _A better calibration set for AWQ._ The Pile is mostly prose. Calibrating on
   code, ideally on FIM-formatted prompts, might help preserving the
   code-sensitive channels.
-- _Fine-tuning._ Changing weights without mangling with the architecture is possible.
+- _Fine-tuning._ Changing weights without touching the architecture is possible.
   And the point above suggests using a code-specific dataset for AWQ. Why not go
   a step further and fine-tune on the FIM-specific dataset? Especially, because
   there is some evidence that FIM fine-tuning can help Qwen2.5-Coder ([Gong et
