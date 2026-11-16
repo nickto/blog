@@ -16,6 +16,10 @@ And yes, of course, you can. But everything ended up being trickier than I
 expected. Even running the model on a GPU had it quirks, not to mention running
 it on an NPU.
 
+In case you want to follow this short write-up step by step, all the scripts
+used for the conversion, benchmarks and plots in this post are [on
+GitLab](https://gitlab.com/nickto/fim-in-flm).
+
 ## Fill-in-the-middle
 
 We are mostly used to chat models that generate text left-to-right: the next
