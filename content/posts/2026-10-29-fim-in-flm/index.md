@@ -13,7 +13,7 @@ I can run a local model for inline suggestions: these do not require powerful
 models, after all. 
 
 And yes, of course, you can. But everything ended up being trickier than I
-expected. Even running the model on a GPU had it quirks, not to mention running
+expected. Even running the model on a GPU had its quirks, not to mention running
 it on an NPU.
 
 In case you want to follow this short write-up step by step, all the scripts
@@ -31,7 +31,7 @@ and the function's body.
 Models used for this type of task are commonly trained with the
 _fill-in-the-middle_ (FIM) objective, proposed by [Bavarian, M., et al. in
 2022](https://arxiv.org/abs/2207.14255). This is neither a different model
-architecture, not a different loss function, rather a different training goal,
+architecture, nor a different loss function, rather a different training goal,
 where, given the text before and after the missing part, the model should fill
 in the missing part. 
 
@@ -108,7 +108,7 @@ so I have to pick.
   which looks like CUDA and compiles to code written specifically for AMD GPU
   architectures.
 
-Vulkan only needs the regular graphics driver, so it is much easier to set up,
+Vulkan only needs the regular graphics driver, so it is much easier to set up.
 Because it runs on any GPU (be it AMD's or Nvidia's) it has larger adoption and
 is more stable. ROCm is vendor-specific and targets the hardware directly. But
 in return one can expect that matrix multiplication should be faster on ROCm. On
@@ -197,7 +197,7 @@ the choice of the models that can run on it is very limited.
 If running models on NPU is hard, why use it at all for our task? The inline
 suggestions are a background task: they fire constantly while you type. So
 running them on a GPU is hard to miss: its load sits close to 100% almost all of
-the time. Even if small iGPU cannot heat your whole house, it still can work as
+the time. Even if a small iGPU cannot heat your whole house, it still can work as
 a good hand warmer, which is nice. But it drains the battery, which is not nice.
 So hopefully, by running the model on an NPU, will lose the hand-warmer feature,
 but save the battery.
@@ -224,7 +224,7 @@ networks).
 
 Among many others, they ship
 [Qwen2.5-3B](https://fastflowlm.com/docs/models/qwen/#-model-card-qwen25-3b-instruct).
-Admittedly, it a bit boring in itself, but it's existence is crucial for our
+Admittedly, it is a bit boring in itself, but its existence is crucial for our
 exercise. Even though it is an Instruct rather than a Coder variant---and
 therefore cannot do FIM---it comes from a family of models that share the same
 architecture and include a Coder variant. And we will use it to run our inline
@@ -332,7 +332,7 @@ configs. So I tried mixing and matching them, taking some files from the Hugging
 Face checkpoint and some from the official NPU2 release. No luck.
 
 Then, before giving up, I asked an LLM what might be wrong (should have done
-that ealier, haha).
+that earlier, haha).
 
 ### Q4_0 and Q4_1: same but different
 
@@ -388,12 +388,8 @@ as Q4_1 should be. In the official model, they peak at 0 (`0000`), 1 (`0001`)
 and 15 (`1111`): signed values centered on zero, which need no offset.
 
 One more clue points the same way: about half of the official scales are
-negative. A Q4_1 scale is always positive, because it spans the group from its
-smallest weight to its largest. A Q4_0 scale can carry a sign.
-
-One more clue points the same way: about half of the official scales are
 negative. A Q4_1 scale is always positive, because the scale is effectively the
-group'ss range, and the sign is captured by an offset. A Q4_0 scale can carry a
+group's range, and the sign is captured by an offset. A Q4_0 scale can carry a
 sign: the quantizer maps the group's largest-_magnitude_ weight onto the −8
 level, so if that weight is positive, the scale comes out negative.
 
@@ -895,7 +891,7 @@ $d$ becomes  $0.64 \div 8 = 0.08$ and $d \div 2 = 0.04$, down from 0.05:
 |       4 |  0.33 |   1 |        0.33 |        0.32 |           0.01 |                              0.01 |
 |   Total |       |     |             |             |                |                          **0.25** |
 
-Channel 1 is now off by 0.16, which sounds like huge rounding error. And it is,
+Channel 1 is now off by 0.16, which sounds like a huge rounding error. And it is,
 but only for the weight itself, which we ultimately don't care about, because
 when multiplied by an activation of 0.1, the contribution of this channel in the
 output error shrinks to 0.02. Meanwhile, the finer grid halves the error of the
@@ -1136,7 +1132,7 @@ plot the difference in pass rate of the variants and the F16 model.
 
 Only the models from the decent group are at least comparable in performance to
 the full-precision variant. But even then, they are still noticeably worse: the
-95% HPD does not contain 0, except for the API block, but it contains much fewer
+95% HPD does not contain 0, except for the API block, but it contains far fewer
 samples, which inflates the variance.
 
 ### Effect of each change
@@ -1363,7 +1359,7 @@ FLM and 27--29 mJ on llama.cpp. Generation is where the difference is larger:
 
 ![Energy per token above idle.](power_energy_per_token.svg)
 
-So NPU sounds like a clear winner. However...
+So the NPU sounds like a clear winner. However...
 
 ### Power after the response
 
@@ -1377,7 +1373,7 @@ above idle for another 6 seconds, and only then drops.
 than half of what the request itself costs. With it, FLM spends 37 J per
 request, and thus, Vulkan, which spends 29 J, becomes the most efficient.
 
-So the answer is: _it depends_. If completions the requests come back-to-back or
+So the answer is: _it depends_. If the requests come back-to-back or
 in quick succession with gaps below 3 seconds, FLM could be the most efficient. But 
 if the requests are more spaced in time, then Vulkan is our winner.
 
@@ -1445,16 +1441,16 @@ this post:
   code-sensitive channels.
 - _Fine-tuning._ Changing weights without mangling with the architecture is possible.
   And the point above suggests using a code-specific dataset for AWQ. Why not go
-  a step further and fine-tune on the FIM-specific dataset? Especially, becuase
-  rhere is some evidence that FIM fine-tuning can help Qwen2.5-Coder ([Gong et
+  a step further and fine-tune on the FIM-specific dataset? Especially, because
+  there is some evidence that FIM fine-tuning can help Qwen2.5-Coder ([Gong et
   al., 2025](https://arxiv.org/abs/2505.18789)).
 - _Existing community fine-tunes._ There are already a few FIM fine-tunes of
   Coder-3B on Hugging Face, so we can skip the previous step and use those.
 
 **Other model sizes.** Qwen2.5-Coder also comes in 0.5B, 1.5B, 7B, 14B and 32B.
 A smaller model would help with the speed, which is the NPU's weak spot here,
-and a larger one with the quality. The problem is that the appraoch described
-here requires the exact same architecture, and FLM ships Qwen2.5 only ine one
+and a larger one with the quality. The problem is that the approach described
+here requires the exact same architecture, and FLM ships Qwen2.5 only in one
 size: 3B. So within Qwen2.5, we are stuck at 3B, and so are the fine-tunes of
 the other Coder sizes, like [Sweep
 Next-Edit](https://huggingface.co/sweepai/sweep-next-edit-1.5B) (1.5B) or Zed's
