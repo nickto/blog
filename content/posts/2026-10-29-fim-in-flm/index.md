@@ -1322,7 +1322,63 @@ short requests as you type.
 
 ## Power draw
 
-TODO
+To measure power, I sent the same 50 SAFIM prompts, one at a time, to the AWQ
+Q4_0 model on FLM and to the same weights on llama.cpp with ROCm and Vulkan.
+Each request waited for the previous response plus a 7-second gap, so every
+request started from idle. During each session I logged the package energy from
+[RAPL](https://en.wikipedia.org/wiki/Perf_(Linux)#RAPL), which covers the CPU
+cores, the iGPU and the NPU. After each session I logged an idle run with the
+model still loaded and used it as the baseline: about 4.4 W for all three
+backends, the same as with no server running at all.
+
+### Power
+
+Looking at the power alone, the NPU wins easily. While processing a request,
+FLM draws on average 8 W above idle, while llama.cpp draws around 42 W on
+Vulkan and 43 W on ROCm.
+
+The NPU also wins without questions on the generation as well: it draws about
+10 W above idle, while Vulkan and ROCm draw about 28 W and 46 W respectively.
+
+![Power above idle per sample.](power_hist.svg)
+
+But we already know that the NPU is slower. A request takes FLM about
+2.4 seconds, compared with 0.8--1 second on llama.cpp. Lower power for a longer
+time does not necessarily mean less energy.
+
+### Energy
+
+It does here, though, just with a smaller margin. FLM spends 22 J per request
+above idle, compared with 28 J on Vulkan and 44 J on ROCm.
+
+![Energy per request above idle.](power_energy_per_request.svg)
+
+Per token, the picture is similar. Prompt processing costs 20 mJ per token on
+FLM and 27--29 mJ on llama.cpp. Generation is where the difference is larger:
+0.44 J per token on FLM, 0.69 J on Vulkan and 1.3 J on ROCm.
+
+![Energy per token above idle.](power_energy_per_token.svg)
+
+So NPU sounds like a clear winner. However...
+
+### Power after the response
+
+There is a catch. After the response is sent, the GPU drops back to idle within
+a second (Vulkan almost immediately). The NPU does not: it stays about 2.4 W
+above idle for another 6 seconds, and only then drops.
+
+![Power above idle after the response.](power_after_request.svg)
+
+2.4 W is not much, but over 6 seconds it adds up to about 15 J, which is more
+than half of what the request itself costs. With it, FLM spends 37 J per
+request, and thus, Vulkan, which spends 29 J, becomes the most efficient.
+
+So the answer is: _it depends_. If completions the requests come back-to-back or
+in quick succession with gaps below 6 seconds, FLM could the most efficient. But 
+if the requests are more spaced in time, then Vulkan is our winner.
+
+Keep in mind that this is a single run per backend, and that RAPL measures the
+whole package.
 
 ## Conclusions
 
@@ -1356,25 +1412,16 @@ fixed cost of about half a second before it even starts processing the prompt.
 End-to-end, a typical completion takes about 1.5 times longer than on the GPU.
 For inline suggestions this is quite noticeable.
 
-**Power** was the whole reason to bother with the NPU in the first place.
-
-> **TODO:** fill in from [Power draw](#power-draw), or, if that section is
-> dropped, say that I did not measure it properly and that the energy
-> efficiency remains the (plausible, but unverified) promise of the NPU.
+**Power** was the whole reason to bother with the NPU in the first place. And
+the conclusion is that it depends. It depends on how often the requests are
+firing. If they are firing very frequently, then FLM is the clear winner among
+our backends. But if the requests are firing less than once in 7 seconds, Vulkan
+becomes a more power efficient option.
 
 So, back to the opening question: is it worth using instead of paying for
-Copilot?
-
-> **TODO:** the actual answer, ideally after using it day to day for a while.
-> Points to cover:
->
-> - A 3B model is not what Copilot runs, so do not expect the same quality, but
->   for short, local completions it is decent.
-> - Is the extra latency noticeable in the editor, or is it fine in practice?
-> - Does the battery life / fan noise / heat make a difference compared to the
->   iGPU?
-> - Which editor plugin I ended up using to connect to FLM (not covered in the
->   post at all yet).
+Copilot? You have to try it yourself. In my experience, it is subjectively worse
+than GitHub Copilot, but you should try it yourself and see if it works for you.
+Is it worth switching to NPU (FLM) instead of GPU (llama.cpp)? It depends.
 
 ## What next
 
