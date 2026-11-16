@@ -1378,7 +1378,7 @@ than half of what the request itself costs. With it, FLM spends 37 J per
 request, and thus, Vulkan, which spends 29 J, becomes the most efficient.
 
 So the answer is: _it depends_. If completions the requests come back-to-back or
-in quick succession with gaps below 6 seconds, FLM could the most efficient. But 
+in quick succession with gaps below 3 seconds, FLM could be the most efficient. But 
 if the requests are more spaced in time, then Vulkan is our winner.
 
 Keep in mind that this is a single run per backend, and that RAPL measures the
@@ -1419,13 +1419,18 @@ For inline suggestions this is quite noticeable.
 **Power** was the whole reason to bother with the NPU in the first place. And
 the conclusion is that it depends. It depends on how often the requests are
 firing. If they are firing very frequently, then FLM is the clear winner among
-our backends. But if the requests are firing less than once in 7 seconds, Vulkan
+our backends. But if the requests are firing less than once in 3 seconds, Vulkan
 becomes a more power efficient option.
 
-So, back to the opening question: is it worth using instead of paying for
-Copilot? You have to try it yourself. In my experience, it is subjectively worse
-than GitHub Copilot, but you should try it yourself and see if it works for you.
-Is it worth switching to NPU (FLM) instead of GPU (llama.cpp)? It depends.
+So, would I use it? Probably not. Not because it doesn't work: getting a FIM
+model onto the NPU took more effort than I expected, but the result is usable,
+and the quality loss is smaller than I feared. It was also a fun journey, along
+which I learnt some new concepts and had to look under the hood of tools I had
+only ever used as black boxes. But subjectively, even though the suggestions
+make sense, they are rarely relevant enough for me to accept them, and the
+latency, especially on the NPU, is hard to miss. Still, for edge cases like an
+air-gapped or airplane-moded (pun intended) laptop, it is definitely better than
+nothing!
 
 ## What next
 
@@ -1464,4 +1469,4 @@ FIM](https://huggingface.co/collections/TIGER-Lab/fim-midtraining) model built
 on Qwen3-8B.
 
 To be clear, these are ideas rather than a plan, and I have not tried any of
-them yet. But it would intereseting to go ahead and explore them, wouldn't it?
+them yet. But it would be interesting to go ahead and explore them, wouldn't it?
