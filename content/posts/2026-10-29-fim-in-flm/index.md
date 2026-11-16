@@ -745,13 +745,13 @@ within $d \div 2$ in a group. What makes them drastically unequal are the
 activations they are applied to. To illustrate this, let's extend our numerical
 example above with activations $x$.
 
-| Channel |     $w$ |  $x$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
-| ------: | ----: | -: | --------: | ----: | --------: |
-|       1 | −0.80 | 0.1 |     −0.80 |  0.00 |      0.00 |
-|       2 |  0.14 | 10 |      0.10 |  0.04 |  **0.40** |
-|       3 | −0.50 |  1 |     −0.50 |  0.00 |      0.00 |
-|       4 |  0.33 |  1 |      0.30 |  0.03 |      0.03 |
-|   Total |       |    |           |       |  **0.43** |
+| Channel | $w$   | $x$ | Rounded $w$ | Rounding error | Error ($x \times$ rounding error) |
+| ------: | ----: | -:  | --------:   | ----:          | --------:                         |
+| 1       | −0.80 | 0.1 | −0.80       | 0.00           | 0.00                              |
+| 2       | 0.14  | 10  | 0.10        | 0.04           | **0.40**                          |
+| 3       | −0.50 | 1   | −0.50       | 0.00           | 0.00                              |
+| 4       | 0.33  | 1   | 0.30        | 0.03           | 0.03                              |
+| Total   |       |     |             |                | **0.43**                          |
 
 The rounding errors of channels 2 and 4 are about the same, but channel 2
 contributes almost all of the output error. So some channels are clearly more
