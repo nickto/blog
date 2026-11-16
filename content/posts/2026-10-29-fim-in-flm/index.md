@@ -774,13 +774,16 @@ non-linearity $\sigma$ is applied:
 \epsilon_j = \hat{h}_j - h_j = \sum_i \hat{w}_{ji} x_i - \sum_i w_{ji} x_i =
 \sum_i (\hat{w}_{ji} - w_{ji}) x_i,
 $$`
+
 where `$\hat{w}_{ji}$` is the rounded weight. So every channel $i$ adds its
 activation times the rounding error of its weight. The rounding error
 `$\hat{w}_{ji} - w_{ji}$` is at most $d \div 2$, no matter what the weight is,
 so
+
 `$$
 |\epsilon_j| \le \frac{d}{2} \sum_i |x_i|.
 $$`
+
 <details style="font-size: 0.8em; color: var(--secondary); margin-top: -4rem;">
   <summary>Strictly speaking, ...</summary>
   ... $d$ is different for each group of weights, but this does not change the intuition.
@@ -794,9 +797,11 @@ Of course, we cannot just shrink an activation: the layer would then compute
 something else. So we divide the activation by a scaling factor $s$, and
 multiply the corresponding column of weights by the same $s$. Then every term
 `$w_{ji} x_i$` of `$h_j$` stays the same:
+
 `$$
 (s \cdot w_{ji}) \cdot \left(x_i \cdot \frac{1}{s}\right) = w_{ji} x_i.
 $$`
+
 Since $h$ stays the same, $y$ also stays exactly the same. Scaling the weight up
 does not make its rounding error larger either: the bound of $d \div 2$ does not
 depend on the weight, only on $d$. Unless the scaled weight becomes the largest
