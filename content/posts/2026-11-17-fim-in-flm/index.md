@@ -1,6 +1,6 @@
 ---
 title: "Get inline suggestions from a model on AMD NPU"
-date: 2026-10-29T12:30:49+02:00
+date: 2026-11-17T12:30:49+02:00
 draft: true
 math: true
 ShowToc: true
