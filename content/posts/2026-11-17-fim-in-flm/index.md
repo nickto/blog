@@ -18,7 +18,9 @@ it on an NPU.
 
 In case you want to follow this short write-up step by step, all the scripts
 used for the conversion, benchmarks and plots in this post are [on
-GitLab](https://gitlab.com/nickto/fim-in-flm).
+GitLab](https://gitlab.com/nickto/fim-in-flm). And if you just want the
+converted models, they are [on Hugging
+Face](https://huggingface.co/collections/nickto/qwen25-coder-3b-awq-for-fim-on-amd-npu).
 
 ## Fill-in-the-middle
 
