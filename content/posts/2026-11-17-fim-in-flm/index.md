@@ -1496,5 +1496,13 @@ lead is [TIGER-Lab's
 FIM](https://huggingface.co/collections/TIGER-Lab/fim-midtraining) model built
 on Qwen3-8B.
 
+**Another runtime.** AMD has its own path to the NPU: quantise with
+[Quark](https://quark.docs.amd.com/latest/supported_accelerators/ryzenai/tutorial_uint4_oga.html),
+then run with ONNX Runtime GenAI. It also only accepts models it already
+supports, but [its list](https://ryzenai.docs.amd.com/en/latest/llm_list.html)
+includes more Qwen2.5 sizes than FLM does, Coder ones among them. The catch is
+that AMD's docs only show running these models on Windows, so I'm not sure how
+well this works on Linux.
+
 To be clear, these are ideas rather than a plan, and I have not tried any of
 them yet. But it would be interesting to go ahead and explore them, wouldn't it?
