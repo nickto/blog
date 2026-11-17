@@ -1,6 +1,6 @@
 ---
 title: "Get inline suggestions from a model on AMD NPU"
-date: 2026-11-17T12:30:49+02:00
+date: 2026-11-17T11:30:49+02:00
 draft: true
 math: true
 ShowToc: true
@@ -49,7 +49,7 @@ will become clear in the [FastFlowLM](#fastflowlm) section.
 
 ### The prompt format
 
-Let's take a simple example. Say, we have the following function: 
+Let's take a simple example. Suppose we have the following function: 
 
 ```python
 def add(a, b):
@@ -57,17 +57,26 @@ def add(a, b):
     return c
 ```
 
-where `c = a + b` is the middle part that should be filled in. Then this function will
-be represented in the training data set in the following way:
+where `c = a + b` is the middle part that should be filled in. We can then mark
+this with special tokens, like this:
 
 ```text
 <|fim_prefix|>def add(a, b):
     <|fim_middle|>c = a + b<|fim_suffix|>
-    return c
+    return c<|endoftext|>
+```
+
+But because the middle section is the one that we need to predict, we move it to
+the end, so in the training data it looks like this:
+
+```text
+<|fim_prefix|>def add(a, b):
+    <|fim_suffix|>
+    return c<|fim_middle|>c = a + b<|endoftext|>
 ```
 
 And during inference, this request should be formatted as the following prompt
-for Qwen 2 models: 
+for Qwen2.5-Coder: 
 
 ```text
 <|fim_prefix|>def add(a, b):
@@ -329,7 +338,7 @@ a clear case of garbage.
 
 First, I thought that this was an issue with the tokenizer or the model
 configs. So I tried mixing and matching them, taking some files from the Hugging
-Face checkpoint and some from the official NPU2 release. No luck.
+Face checkpoint and some from the official Q4NX release. No luck.
 
 Then, before giving up, I asked an LLM what might be wrong (should have done
 that earlier, haha).
@@ -904,8 +913,9 @@ important channel 2, and the total drops from 0.43 to 0.25.
 
 So why not clip harder? Because the deeper we cut, the larger the error of the
 outlier, and at some point the cap starts cutting into weights that do matter.
-Cap the group at 0.32, for example, and channels 3 and 4 get clipped too: the
-total error climbs back to 0.44, worse than no clipping at all.
+Cap the group at 0.32, for example, and channels 3 and 4 get clipped too (with
+$d = 0.04$, the largest positive level is $7 \times 0.04 = 0.28$): the total
+error climbs back to 0.48, worse than no clipping at all.
 
 Just like with scaling, the right cap depends on the activations, so AWQ finds
 it by using the calibration data. For each group, it tries a range of caps and
@@ -981,12 +991,11 @@ In practice, there were a couple of gotchas when running on CPU:
   As usual with annoying bugs, nothing crashes. But the resulting model does not
   work. Now my pipeline patches this part of the code in AutoAWQ to
   `v.cpu().clone()`, which always makes a copy.
-- It is painfully slow on CPU: about 108 seconds per layer, so almost two hours
-  for the 3B model. I even tried optimizing the number of threads, but the gains
-  were negligible. When you know that it will work, it is fine. But while
-  developing, mistakes are common, and every mistake gets expensive. After a few
-  failures, I lost patience and moved the AutoAWQ step to a GPU instance in the
-  cloud.
+- It is painfully slow on CPU: almost two hours for the 3B model. I even tried
+  optimizing the number of threads, but the gains were negligible. When you know
+  that it will work, it is fine. But while developing, mistakes are common, and
+  every mistake gets expensive. After a few failures, I lost patience and moved
+  the AutoAWQ step to a GPU instance in the cloud.
 
 ### Smoke test
 
@@ -1187,14 +1196,11 @@ frequency penalty of 1.1 and top-k of 10, applied to any field the request
 leaves out. My first run used them, and the AWQ variants on FLM scored slightly
 worse than with llama-server's defaults, so it is worth overriding them.
 
-So the gap is not explained by sampling. The weights are identical (FLM's q4nx files hold the
-same Q4_0 nibbles as the GGUFs), and the prompts tokenize to the same tokens.
-For plain Q4_0, about 60% of samples differ already at the first generated
-token, and these carry most of the gap (12 of 16
-percentage points on control). So it seems likely that this is due to
-lower-precision arithmetic on the NPU, whose errors get amplified when the
-weights are already damaged by quantization. But this is just a plausible
-hypothesis.
+So the gap is not explained by sampling. The weights are identical (FLM's q4nx
+files hold the same Q4_0 nibbles as the GGUFs), and the prompts tokenize to the
+same tokens. So it seems likely that this is due to lower-precision arithmetic on
+the NPU, whose errors get amplified when the weights are already damaged by
+quantization. But this is just a plausible hypothesis.
 
 ### How the variants fail
 
@@ -1321,11 +1327,11 @@ is based on three prompt sizes only.
 
 Here is how FLM compares to llama.cpp running the same Q4_0 model on the iGPU:
 
-![Prompt processing throughput: FLM on the NPU vs llama.cpp with ROCm and Vulkan.](bench_flm_vs_llama_cpp_prompt.svg)
+![Token generation throughput: FLM on the NPU vs llama.cpp with ROCm and Vulkan.](bench_flm_vs_llama_cpp_generation.svg)
 
 FLM generates slower than either ROCm or Vulkan.
 
-![Token generation throughput: FLM on the NPU vs llama.cpp with ROCm and Vulkan.](bench_flm_vs_llama_cpp_generation.svg)
+![Prompt processing throughput: FLM on the NPU vs llama.cpp with ROCm and Vulkan.](bench_flm_vs_llama_cpp_prompt.svg)
 
 For prompt processing, the picture is more interesting. Although FLM is slower
 in our tests, as the prompt length grows, the gap narrows. In fact, the marginal
@@ -1354,7 +1360,7 @@ backends, the same as with no server running at all.
 
 ### Power
 
-Looking at the power alone, the NPU wins easily. While processing a request,
+Looking at the power alone, the NPU wins easily. During prompt processing,
 FLM draws on average 8 W above idle, while llama.cpp draws around 42 W on
 Vulkan and 43 W on ROCm.
 
@@ -1364,7 +1370,8 @@ The NPU wins on generation too: it draws about
 ![Power above idle per sample.](power_hist.svg)
 
 But we already know that the NPU is slower. A request takes FLM about
-2.4 seconds, compared with 0.8--1 second on llama.cpp. Lower power for a longer
+2.4 seconds, compared with 0.8--1 second on llama.cpp (these requests are
+shorter than in the estimate above, so FLM's fixed cost weighs more). Lower power for a longer
 time does not necessarily mean less energy.
 
 ### Energy
@@ -1392,14 +1399,15 @@ above idle for another 6 seconds, and only then drops.
 
 2.4 W is not much, but over 6 seconds it adds up to about 15 J, which is more
 than half of what the request itself costs. With it, FLM spends 37 J per
-request, and thus, Vulkan, which spends 29 J, becomes the most efficient.
+request, and thus, Vulkan, which spends 29 J including its own short tail, becomes the most efficient.
 
 So the answer is: _it depends_. If the requests come back-to-back or
 in quick succession with gaps below 3 seconds, FLM could be the most efficient. But 
 if the requests are more spaced in time, then Vulkan is our winner.
 
 Keep in mind that this is a single run per backend, and that RAPL measures the
-whole package.
+whole package, but not the DRAM. Generation is memory-bound, so the true cost
+per token is somewhat higher for all three backends than the numbers above.
 
 ## Conclusions
 
